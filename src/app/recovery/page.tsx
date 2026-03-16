@@ -76,7 +76,7 @@ export default function RecoveryPage() {
         <div className="bg-card rounded-2xl p-4 space-y-1">
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">HRV (Last Night)</p>
           <p className="text-3xl font-bold font-mono text-secondary">{fmt(latest?.hrv_last_night, 1)}</p>
-          <p className="text-xs text-muted-foreground">7d avg: {fmt(latest?.hrv_weekly_avg, 1)}</p>
+          <p className="text-xs text-muted-foreground">status: {latest?.hrv_status ?? "—"}</p>
         </div>
         <div className="bg-card rounded-2xl p-4 space-y-1">
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Resting HR</p>
@@ -118,7 +118,7 @@ export default function RecoveryPage() {
                   <YAxis tick={{ fontSize: 10, fill: "oklch(0.65 0.02 257)" }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Area type="monotone" dataKey="hrv_last_night" stroke="oklch(0.7845 0.1325 181.91)" fill="url(#hrvGrad)" strokeWidth={2} dot={false} name="HRV" />
-                  <Line type="monotone" dataKey="hrv_weekly_avg" stroke="oklch(0.65 0.02 257)" strokeWidth={1} dot={false} strokeDasharray="4 2" name="7d avg" />
+                  {/* rolling avg computed client-side — skip if field unavailable */}
                 </AreaChart>
               </ResponsiveContainer>
             </div>

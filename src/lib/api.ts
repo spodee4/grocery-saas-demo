@@ -1,11 +1,11 @@
-const API_URL = process.env.COACH_API_URL || process.env.NEXT_PUBLIC_COACH_API_URL || ""
-const API_TOKEN = process.env.COACH_API_TOKEN || process.env.NEXT_PUBLIC_COACH_API_TOKEN || ""
-
+// All API calls go through /api/coach/... proxy — keeps Mac mini token server-side
+// and works from any device/network without needing Tailscale in the browser.
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  // path is like /api/coaching/dashboard → proxy to /api/coach/coaching/dashboard
+  const proxyPath = path.replace(/^\/api\//, "/api/coach/")
+  const res = await fetch(proxyPath, {
     ...init,
     headers: {
-      Authorization: `Bearer ${API_TOKEN}`,
       "Content-Type": "application/json",
       ...init?.headers,
     },
@@ -65,6 +65,14 @@ export interface TrendPoint {
   acwr: number | null
   vo2_max: number | null
   tss: number | null
+  hrv_last_night: number | null
+  hrv_status: string | null
+  resting_hr: number | null
+  sleep_seconds: number | null
+  deep_sleep_seconds: number | null
+  body_battery_wake: number | null
+  body_battery_eod: number | null
+  training_readiness_score: number | null
 }
 
 export interface Workout {
@@ -100,7 +108,18 @@ export interface BodyPoint {
 
 // Client-side fetchers (used with TanStack Query)
 export const fetchDashboard = () => apiFetch<DashboardData>("/api/coaching/dashboard")
-export const fetchTrends = (days = 90) => apiFetch<TrendPoint[]>(`/api/coaching/trends?days=${days}`)
-export const fetchWorkouts = (limit = 14, type?: string) =>
-  apiFetch<Workout[]>(`/api/coaching/workouts?limit=${limit}${type ? `&type=${type}` : ""}`)
-export const fetchBody = (days = 90) => apiFetch<{ history: BodyPoint[]; latest: BodyPoint | null }>(`/api/coaching/body?days=${days}`)
+
+export const fetchTrends = async (days = 90): Promise<TrendPoint[]> => {
+  const res = await apiFetch<{ data: TrendPoint[] } | TrendPoint[]>(`/api/coaching/trends?days=${days}`)
+  return Array.isArray(res) ? res : (res as any).data ?? []
+}
+
+export const fetchWorkouts = async (limit = 14, type?: string): Promise<Workout[]> => {
+  const res = await apiFetch<{ workouts: Workout[] } | Workout[]>(
+    `/api/coaching/workouts?limit=${limit}${type ? `&type=${type}` : ""}`
+  )
+  return Array.isArray(res) ? res : (res as any).workouts ?? []
+}
+
+export const fetchBody = (days = 90) =>
+  apiFetch<{ history: BodyPoint[]; latest: BodyPoint | null }>(`/api/coaching/body?days=${days}`)
