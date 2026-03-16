@@ -172,7 +172,6 @@ function DashboardInner() {
   const storeId = params.get("store") ?? "lakes"
   const store = STORES[storeId] ?? STORES.lakes
 
-  const [riskyOpen, setRiskyOpen] = useState(false)
   const [suspiciousOpen, setSuspiciousOpen] = useState(false)
   const salesDelta = delta(store.weekly_sales, store.prior_weekly_sales)
   const pendingInvoices = store.recent_invoices.filter(i => i.status === "pending").length
@@ -182,10 +181,8 @@ function DashboardInner() {
   const totalWeekSales = store.departments.reduce((s, d) => s + d.sales, 0)
 
   // Alert card metrics
-  const riskyCount = store.tender.voids + store.tender.refunds
   const totalShrink = store.shrink?.reduce((s, r) => s + r.shrink_dollars, 0) ?? 0
   const topShrinkDept = store.shrink?.reduce((a, b) => a.shrink_pct > b.shrink_pct ? a : b, store.shrink[0])
-  const lowMarginItems = PRODUCT_CATALOG.filter(p => p.gm_pct < 25).length
 
   return (
     <div className="p-6 max-w-5xl space-y-6">
@@ -347,36 +344,18 @@ function DashboardInner() {
         </div>
       </div>
 
-      {/* Alert cards row */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Risky Transactions */}
-        <button onClick={() => setRiskyOpen(true)} className="text-left bg-card border border-destructive/30 rounded-lg p-4 shadow-sm hover:border-destructive/60 transition-colors">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Risky Transactions</p>
-          <p className="text-3xl font-semibold tabular-nums text-destructive mt-1">{riskyCount}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {store.tender.voids} voids · {store.tender.refunds} refunds (${store.tender.refund_amount.toLocaleString()})
-          </p>
-          <p className="text-xs text-primary mt-2">View details →</p>
-        </button>
-
-        {/* Low Margin Items */}
-        <Link href={`/database?store=${storeId}`} className="block bg-card border border-secondary/30 rounded-lg p-4 shadow-sm hover:border-secondary/60 transition-colors">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Low Margin Items</p>
-          <p className="text-3xl font-semibold tabular-nums text-secondary mt-1">{lowMarginItems}</p>
-          <p className="text-xs text-muted-foreground mt-1">Items below 25% GM in catalog</p>
-          <p className="text-xs text-primary mt-2">Review in database →</p>
-        </Link>
-
-        {/* Shrink Exposure */}
-        <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+      {/* Shrink Exposure */}
+      <Link href={`/shrink?store=${storeId}`} className="block bg-card border border-border rounded-lg p-4 shadow-sm hover:border-primary/40 transition-colors">
+        <div className="flex items-center justify-between">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shrink Exposure</p>
-          <p className="text-3xl font-semibold tabular-nums mt-1">${totalShrink.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            This week · worst: <span className="font-medium text-foreground">{topShrinkDept?.dept}</span> at {topShrinkDept?.shrink_pct.toFixed(1)}%
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">Unknown: ${store.shrink?.reduce((s, r) => s + r.unknown, 0).toLocaleString()}</p>
+          <p className="text-xs text-primary">View full report →</p>
         </div>
-      </div>
+        <p className="text-3xl font-semibold tabular-nums mt-1">${totalShrink.toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          This week · worst: <span className="font-medium text-foreground">{topShrinkDept?.dept}</span> at {topShrinkDept?.shrink_pct.toFixed(1)}%
+          {" "}· Unknown: <span className="text-amber-500 font-medium">${store.shrink?.reduce((s, r) => s + r.unknown, 0).toLocaleString()}</span>
+        </p>
+      </Link>
 
       {/* Suspicious transactions modal */}
       {suspiciousOpen && (
@@ -386,36 +365,6 @@ function DashboardInner() {
         />
       )}
 
-      {/* Risky transactions modal */}
-      {riskyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setRiskyOpen(false)}>
-          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-md w-full mx-4 p-6 space-y-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-lg">Risky Transactions</p>
-              <button onClick={() => setRiskyOpen(false)} className="text-muted-foreground hover:text-foreground">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" /></svg>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Voids",          value: store.tender.voids,   color: "text-destructive", note: "Cancelled transactions" },
-                { label: "Refunds",        value: store.tender.refunds,  color: "text-destructive", note: `$${store.tender.refund_amount.toLocaleString()} total` },
-                { label: "Void Rate",      value: `${((store.tender.voids / store.transactions) * 100).toFixed(2)}%`, color: store.tender.voids / store.transactions > 0.01 ? "text-destructive" : "text-foreground", note: "of all transactions" },
-                { label: "Refund Rate",    value: `${((store.tender.refunds / store.transactions) * 100).toFixed(2)}%`, color: "text-foreground", note: "of all transactions" },
-              ].map(f => (
-                <div key={f.label} className="bg-muted/20 rounded-lg px-3 py-2.5">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{f.label}</p>
-                  <p className={`text-xl font-semibold tabular-nums mt-0.5 ${f.color}`}>{f.value}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{f.note}</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-muted/20 rounded-lg px-4 py-3 text-xs text-muted-foreground leading-relaxed">
-              High void rates (&gt;1%) can indicate training issues, pricing errors, or theft. Refund totals above $3K/week warrant cashier-level review.
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Dept breakdown chart */}
       <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
