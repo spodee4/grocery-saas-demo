@@ -184,13 +184,41 @@ function SuspiciousTxnModal({ txns, onClose }: { txns: SuspiciousTxn[]; onClose:
   )
 }
 
+const WEEK_PILLS = [
+  { id: "wtd", label: "WTD",    range: "Mar 10–16, 2026",    sMult: 1.000, pMult: 1.010 },
+  { id: "w10", label: "Wk 10",  range: "Mar 3–9, 2026",      sMult: 0.990, pMult: 0.982 },
+  { id: "w9",  label: "Wk 9",   range: "Feb 24–Mar 2, 2026", sMult: 1.043, pMult: 0.990 },
+  { id: "w8",  label: "Wk 8",   range: "Feb 17–23, 2026",    sMult: 0.921, pMult: 1.043 },
+  { id: "w7",  label: "Wk 7",   range: "Feb 10–16, 2026",    sMult: 0.968, pMult: 0.921 },
+  { id: "custom", label: "Custom", range: "",                 sMult: 1.000, pMult: 1.000 },
+]
+
 function DashboardInner() {
   const params = useSearchParams()
   const storeId = params.get("store") ?? "lakes"
   const store = STORES[storeId] ?? STORES.lakes
 
   const [suspiciousOpen, setSuspiciousOpen] = useState(false)
-  const salesDelta = delta(store.weekly_sales, store.prior_weekly_sales)
+  const [selectedWeek, setSelectedWeek] = useState("wtd")
+  const [customFrom, setCustomFrom] = useState("2026-03-01")
+  const [customTo,   setCustomTo]   = useState("2026-03-16")
+
+  const customMult = Math.max(1, (new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86400000 + 1) / 7
+  const customRange = (() => {
+    const fmt = (s: string) => { const d = new Date(s); return `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}` }
+    return `${fmt(customFrom)} – ${fmt(customTo)}, 2026`
+  })()
+
+  const weekPill = WEEK_PILLS.find(w => w.id === selectedWeek) ?? WEEK_PILLS[0]
+  const effectivePill = selectedWeek === "custom"
+    ? { ...weekPill, range: customRange, sMult: customMult, pMult: customMult * 1.01 }
+    : weekPill
+  const wSales   = store.weekly_sales * effectivePill.sMult
+  const wGM      = store.weekly_gm    * effectivePill.sMult
+  const wTxns    = Math.round(store.transactions * effectivePill.sMult)
+  const wPrior   = store.prior_weekly_sales * effectivePill.pMult
+
+  const salesDelta = delta(wSales, wPrior)
   const pendingInvoices = store.recent_invoices.filter(i => i.status === "pending").length
 
   // Dept breakdown
@@ -208,19 +236,43 @@ function DashboardInner() {
           {store.name}
           <span className="text-muted-foreground font-normal"> · {store.location}</span>
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Week of Mar 10–16, 2026 · BRdata POS</p>
+        <p className="text-sm text-muted-foreground mt-1">{effectivePill.range || "Custom range"} · BRdata POS</p>
+        <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+          {WEEK_PILLS.map(w => (
+            <button
+              key={w.id}
+              onClick={() => setSelectedWeek(w.id)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                selectedWeek === w.id
+                  ? "bg-primary text-background"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              }`}
+            >
+              {w.label}
+            </button>
+          ))}
+          {selectedWeek === "custom" && (
+            <div className="flex items-center gap-1.5 ml-1">
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="text-xs bg-card border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50" />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="text-xs bg-card border border-border rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard label="Weekly Sales" value={fmt$(store.weekly_sales)} deltaLabel={salesDelta.label} positive={salesDelta.positive} sub="vs prior week"
-          storeId={storeId} chatPrompt={`My store ${store.name} had weekly sales of ${fmt$(store.weekly_sales)}, which is ${salesDelta.label} vs last week ($${store.prior_weekly_sales.toLocaleString()}). Analyze this performance and ask me 3 targeted questions to help diagnose what's driving the change.`} />
-        <KPICard label="Gross Profit" value={fmt$(store.weekly_gm)} deltaLabel={fmtPct(store.weekly_gm_pct)} positive={true} sub="margin"
-          storeId={storeId} chatPrompt={`My gross profit this week is ${fmt$(store.weekly_gm)} at ${fmtPct(store.weekly_gm_pct)} margin for ${store.name}. My top departments by GM% are: ${store.departments.slice().sort((a,b)=>b.gm_pct-a.gm_pct).slice(0,3).map(d=>`${d.dept} ${fmtPct(d.gm_pct)}`).join(', ')}. Is this healthy for an independent grocery? What should I be watching? Ask me 3 questions to dig deeper.`} />
-        <KPICard label="Transactions" value={store.transactions.toLocaleString()} sub="this week"
-          storeId={storeId} chatPrompt={`${store.name} had ${store.transactions.toLocaleString()} transactions this week with an average basket of $${store.avg_basket.toFixed(2)}. What do these numbers tell me about customer behavior and store traffic? Ask me 3 questions to understand the patterns better.`} />
+        <KPICard label="Weekly Sales" value={fmt$(wSales)} deltaLabel={salesDelta.label} positive={salesDelta.positive} sub="vs prior week"
+          storeId={storeId} chatPrompt={`My store ${store.name} had weekly sales of ${fmt$(wSales)}, which is ${salesDelta.label} vs last week (${fmt$(wPrior)}). Analyze this performance and ask me 3 targeted questions to help diagnose what's driving the change.`} />
+        <KPICard label="Gross Profit" value={fmt$(wGM)} deltaLabel={fmtPct(store.weekly_gm_pct)} positive={true} sub="margin"
+          storeId={storeId} chatPrompt={`My gross profit this week is ${fmt$(wGM)} at ${fmtPct(store.weekly_gm_pct)} margin for ${store.name}. My top departments by GM% are: ${store.departments.slice().sort((a,b)=>b.gm_pct-a.gm_pct).slice(0,3).map(d=>`${d.dept} ${fmtPct(d.gm_pct)}`).join(', ')}. Is this healthy for an independent grocery? What should I be watching? Ask me 3 questions to dig deeper.`} />
+        <KPICard label="Transactions" value={wTxns.toLocaleString()} sub="this week"
+          storeId={storeId} chatPrompt={`${store.name} had ${wTxns.toLocaleString()} transactions this week with an average basket of $${store.avg_basket.toFixed(2)}. What do these numbers tell me about customer behavior and store traffic? Ask me 3 questions to understand the patterns better.`} />
         <KPICard label="Avg Basket" value={`$${store.avg_basket.toFixed(2)}`} sub="per transaction"
-          storeId={storeId} chatPrompt={`My average basket size is $${store.avg_basket.toFixed(2)} across ${store.transactions.toLocaleString()} transactions at ${store.name}. How does this compare to typical independent grocery benchmarks? What strategies could increase basket size? Ask me 3 questions first to understand my situation.`} />
+          storeId={storeId} chatPrompt={`My average basket size is $${store.avg_basket.toFixed(2)} across ${wTxns.toLocaleString()} transactions at ${store.name}. How does this compare to typical independent grocery benchmarks? What strategies could increase basket size? Ask me 3 questions first to understand my situation.`} />
       </div>
 
       <div className="grid grid-cols-3 gap-4">

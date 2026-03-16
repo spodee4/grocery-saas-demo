@@ -1,6 +1,8 @@
 "use client"
 
+import * as XLSX from "xlsx"
 import { useState, useRef, useCallback } from "react"
+import { CopyButton } from "@/components/CopyButton"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { STORES, type Invoice, lookupProduct } from "@/lib/demo-data"
@@ -126,12 +128,18 @@ const ALL_DEPTS = Array.from(new Set(
   Object.values(STORES).flatMap(s => s.recent_invoices.map(i => i.dept))
 )).sort()
 
-function esc(v: string | number) { return `"${String(v).replace(/"/g, '""')}"` }
+function autoFitCols(rows: (string | number)[][]): XLSX.ColInfo[] {
+  const numCols = Math.max(...rows.map(r => r.length))
+  return Array.from({ length: numCols }, (_, ci) => {
+    const maxLen = rows.reduce((m, r) => Math.max(m, String(r[ci] ?? "").length), 0)
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 55) }
+  })
+}
 
 function exportInvoiceCSV(inv: Invoice) {
   const gap = inv.allowance_earned - inv.allowance_applied
   const totalExt = inv.line_items.reduce((s, li) => s + li.extended, 0)
-  const rows: string[][] = [
+  const rows = [
     ["INVOICE DETAILS"],
     ["Invoice #", inv.id],
     ["Vendor", inv.vendor],
@@ -148,21 +156,18 @@ function exportInvoiceCSV(inv: Invoice) {
     ["LINE ITEMS"],
     ["Description", "UPC", "Pack Size", "Cases", "Unit Cost", "Promo $", "Extended"],
     ...inv.line_items.map(li => [
-      li.description,
-      li.upc,
-      li.pack_size,
-      String(li.cases),
+      li.description, li.upc, li.pack_size, li.cases,
       `$${li.unit_cost.toFixed(2)}`,
       li.promo_dollars > 0 ? `$${li.promo_dollars.toFixed(2)}` : "",
       `$${li.extended.toFixed(2)}`,
     ]),
     ["", "", "", "", "", "TOTAL", `$${totalExt.toFixed(2)}`],
   ]
-  const csv = rows.map(r => r.map(esc).join(",")).join("\n")
-  const a = document.createElement("a")
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
-  a.download = `${inv.id}.csv`
-  a.click()
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  ws["!cols"] = autoFitCols(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, "Invoice")
+  XLSX.writeFile(wb, `${inv.id}.xlsx`)
 }
 
 function exportBulkCSV(invoices: (Invoice & { _store: string })[]) {
@@ -170,24 +175,18 @@ function exportBulkCSV(invoices: (Invoice & { _store: string })[]) {
   const rows = [
     headers,
     ...invoices.map(i => [
-      i._store,
-      i.id,
-      i.vendor,
-      i.dept,
-      i.date,
-      i.amount.toFixed(2),
-      i.status,
-      i.allowance_earned.toFixed(2),
-      i.allowance_applied.toFixed(2),
-      (i.allowance_earned - i.allowance_applied).toFixed(2),
+      i._store, i.id, i.vendor, i.dept, i.date,
+      i.amount, i.status,
+      i.allowance_earned, i.allowance_applied,
+      i.allowance_earned - i.allowance_applied,
     ]),
   ]
-  const csv = rows.map(r => r.map(esc).join(",")).join("\n")
-  const a = document.createElement("a")
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  ws["!cols"] = autoFitCols(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, "Invoices")
   const now = new Date().toISOString().slice(0, 10)
-  a.download = `invoices-${now}.csv`
-  a.click()
+  XLSX.writeFile(wb, `invoices-${now}.xlsx`)
 }
 
 function exportInvoicePDF(inv: Invoice) {
@@ -341,12 +340,15 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
                       <tr key={i} className={`border-b border-border/30 ${i % 2 === 1 ? "bg-muted/5" : ""}`}>
                         <td className="px-4 py-2 font-medium">{li.description}</td>
                         <td className="px-3 py-2">
-                          <button
-                            onClick={() => setExpandedUpc(expandedUpc === li.upc ? null : li.upc)}
-                            className={`font-mono underline decoration-dotted transition-colors ${expandedUpc === li.upc ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
-                          >
-                            {li.upc}
-                          </button>
+                          <span className="flex items-center gap-1">
+                            <button
+                              onClick={() => setExpandedUpc(expandedUpc === li.upc ? null : li.upc)}
+                              className={`font-mono underline decoration-dotted transition-colors ${expandedUpc === li.upc ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                            >
+                              {li.upc}
+                            </button>
+                            <CopyButton value={li.upc} />
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{li.pack_size}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{li.cases}</td>
@@ -460,12 +462,39 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
   )
 }
 
+type SortCol = "id" | "vendor" | "dept" | "date" | "amount" | "gap" | "status"
+
+function SortTh({ col, label, right = false, sortBy, sortDir, onSort }: {
+  col: SortCol; label: string; right?: boolean
+  sortBy: SortCol; sortDir: "asc" | "desc"; onSort: (c: SortCol) => void
+}) {
+  const active = sortBy === col
+  const arrow = active ? (sortDir === "asc" ? "▲" : "▼") : ""
+  return (
+    <th
+      onClick={() => onSort(col)}
+      className={`px-5 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none transition-colors ${right ? "text-right" : "text-left"} ${active ? "text-foreground" : "text-muted-foreground hover:text-foreground/70"}`}
+    >
+      {right ? <>{label}{arrow && <span className="ml-1 text-primary">{arrow}</span>}</> : <>{arrow && <span className="mr-1 text-primary">{arrow}</span>}{label}</>}
+    </th>
+  )
+}
+
 function InvoiceLibrary({ storeId }: { storeId: string }) {
   const [vendor, setVendor] = useState("")
   const [dept, setDept] = useState("")
   const [status, setStatus] = useState("")
   const [week, setWeek] = useState("")
   const [selected, setSelected] = useState<Invoice | null>(null)
+  const [sortBy, setSortBy] = useState<SortCol>("date")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
+
+  function toggleSort(col: SortCol) {
+    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc")
+    else { setSortBy(col); setSortDir("desc") }
+  }
 
   // Collect invoices from active store(s)
   const allInvoices = storeId === "company"
@@ -476,12 +505,27 @@ function InvoiceLibrary({ storeId }: { storeId: string }) {
   const allWeeks = Array.from(new Set(allInvoices.map(i => getWeekLabel(i.date))))
     .sort((a, b) => weekSortKey(b) - weekSortKey(a))
 
-  const filtered = allInvoices.filter(i =>
-    (!vendor || i.vendor === vendor) &&
-    (!dept   || i.dept === dept) &&
-    (!status || i.status === status) &&
-    (!week   || getWeekLabel(i.date) === week)
-  )
+  const filtered = allInvoices.filter(i => {
+    const d = new Date(i.date).getTime()
+    const dateOk = week === "custom"
+      ? (!customFrom || d >= new Date(customFrom).getTime()) && (!customTo || d <= new Date(customTo).getTime())
+      : (!week || getWeekLabel(i.date) === week)
+    return (!vendor || i.vendor === vendor) && (!dept || i.dept === dept) && (!status || i.status === status) && dateOk
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    let av: string | number, bv: string | number
+    const gap = (inv: typeof a) => inv.allowance_earned - inv.allowance_applied
+    if (sortBy === "id")     { av = a.id;                bv = b.id }
+    else if (sortBy === "vendor") { av = a.vendor;       bv = b.vendor }
+    else if (sortBy === "dept")   { av = a.dept;         bv = b.dept }
+    else if (sortBy === "date")   { av = new Date(a.date).getTime(); bv = new Date(b.date).getTime() }
+    else if (sortBy === "amount") { av = a.amount;       bv = b.amount }
+    else if (sortBy === "gap")    { av = gap(a);         bv = gap(b) }
+    else                          { av = a.status;       bv = b.status }
+    const cmp = typeof av === "string" ? av.localeCompare(String(bv)) : av - (bv as number)
+    return sortDir === "asc" ? cmp : -cmp
+  })
 
   const total = filtered.reduce((s, i) => s + i.amount, 0)
   const gaps  = filtered.reduce((s, i) => s + (i.allowance_earned - i.allowance_applied), 0)
@@ -494,7 +538,17 @@ function InvoiceLibrary({ storeId }: { storeId: string }) {
           className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring font-medium">
           <option value="">All Weeks</option>
           {allWeeks.map(w => <option key={w} value={w}>{w}</option>)}
+          <option value="custom">Custom Range…</option>
         </select>
+        {week === "custom" && (
+          <>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </>
+        )}
         <select value={vendor} onChange={e => setVendor(e.target.value)}
           className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
           <option value="">All Vendors</option>
@@ -545,17 +599,17 @@ function InvoiceLibrary({ storeId }: { storeId: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
-              <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Invoice</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendor</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Dept</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</th>
-              <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
-              <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Allowance Gap</th>
-              <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
+              <SortTh col="id"     label="Invoice"       sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="vendor" label="Vendor"        sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="dept"   label="Dept"          sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="date"   label="Date"          sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="amount" label="Amount"  right sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="gap"    label="Allowance Gap" right sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh col="status" label="Status"        sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
-            {filtered.map((inv, i) => {
+            {sorted.map((inv, i) => {
               const gap = inv.allowance_earned - inv.allowance_applied
               return (
                 <tr key={inv.id}
@@ -1135,7 +1189,7 @@ function SpreadsheetImport() {
                 </svg>
               </div>
               <p className="text-sm font-medium">Drop spreadsheet here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">Supports .csv · To use Excel: File → Save As → CSV</p>
+              <p className="text-xs text-muted-foreground mt-1">Supports .csv · .xlsx (Excel) · .xls · Google Sheets export</p>
             </div>
           ) : (
             <div className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3">
@@ -1320,7 +1374,7 @@ function InvoicesInner() {
         <div>
           <h1 className="text-2xl font-semibold">Invoice Intelligence</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Standardized invoice data regardless of vendor — URM, Coke, Frito, Bimbo, Ranz, all in one format
+            Standardized invoice data regardless of vendor — URM, Coke, Frito, Bimbo, Franz, all in one format
           </p>
         </div>
         <div className="flex bg-muted rounded-lg p-1 gap-1">

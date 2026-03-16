@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { PRODUCT_CATALOG, URM_CATALOG, UNFI_CATALOG, type ProductCatalogItem, type OrderGuideItem } from "@/lib/demo-data"
+import { CopyButton } from "@/components/CopyButton"
 
 type DbTab = "store" | "urm" | "unfi"
 
@@ -112,7 +113,7 @@ function StoreDatabase() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "UPC",         value: selected.upc },
+                { label: "UPC",         value: selected.upc,                          copy: true },
                 { label: "Pack Size",   value: selected.pack_size },
                 { label: "Units/Case",  value: String(selected.units_per_case) },
                 { label: "Case Cost",   value: `$${selected.case_cost.toFixed(2)}` },
@@ -123,7 +124,10 @@ function StoreDatabase() {
               ].map(f => (
                 <div key={f.label} className="bg-muted/20 rounded-lg px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{f.label}</p>
-                  <p className={`font-semibold mt-0.5 ${f.color ?? ""}`}>{f.value}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <p className={`font-semibold ${f.color ?? ""}`}>{f.value}</p>
+                    {f.copy && <CopyButton value={f.value} />}
+                  </div>
                 </div>
               ))}
             </div>
@@ -253,8 +257,8 @@ function OrderGuideTable({ catalog, deptList, vendorLabel }: { catalog: OrderGui
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: "Warehouse Item #", value: selected.item_no, mono: true },
-                  { label: "UPC",              value: selected.upc, mono: true },
+                  { label: "Warehouse Item #", value: selected.item_no, mono: true, copy: true },
+                  { label: "UPC",              value: selected.upc, mono: true, copy: true },
                   { label: "Pack Size",         value: selected.pack_size },
                   { label: "Units/Case",        value: String(selected.units_per_case) },
                   { label: "Case Cost",         value: `$${selected.case_cost.toFixed(2)}` },
@@ -265,7 +269,10 @@ function OrderGuideTable({ catalog, deptList, vendorLabel }: { catalog: OrderGui
                 ].map(f => (
                   <div key={f.label} className="bg-muted/20 rounded-lg px-3 py-2">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{f.label}</p>
-                    <p className={`font-semibold mt-0.5 ${f.color ?? ""} ${f.mono ? "font-mono text-sm" : ""}`}>{f.value}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <p className={`font-semibold ${f.color ?? ""} ${f.mono ? "font-mono text-sm" : ""}`}>{f.value}</p>
+                      {f.copy && <CopyButton value={f.value} />}
+                    </div>
                   </div>
                 ))}
               </div>

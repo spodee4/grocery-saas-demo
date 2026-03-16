@@ -8,7 +8,7 @@ import { STORES } from "@/lib/demo-data"
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
 type ReportType  = "pnl" | "sales" | "deposit" | "shrink" | "aging"
-type PeriodKey   = "week" | "lastweek" | "mtd" | "lastmonth" | "ytd"
+type PeriodKey   = "week" | "lastweek" | "mtd" | "lastmonth" | "ytd" | "custom"
 
 const PERIODS: { id: PeriodKey; label: string; factor: number; label2: string }[] = [
   { id: "week",      label: "This Week",   factor: 1,    label2: "Mar 10–16, 2026" },
@@ -574,7 +574,23 @@ function ReportsInner() {
   const storeId = params.get("store") ?? "lakes"
   const [activeReport, setActiveReport] = useState<ReportType>("pnl")
   const [periodId, setPeriodId] = useState<PeriodKey>("week")
-  const period = useMemo(() => PERIODS.find(p => p.id === periodId)!, [periodId])
+  const [customFrom, setCustomFrom] = useState("2026-03-01")
+  const [customTo,   setCustomTo]   = useState("2026-03-16")
+
+  const customFactor = useMemo(() => {
+    const days = Math.max(1, (new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86400000 + 1)
+    return days / 7
+  }, [customFrom, customTo])
+
+  const customLabel2 = useMemo(() => {
+    const fmt = (s: string) => { const d = new Date(s); return `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}` }
+    return `${fmt(customFrom)} – ${fmt(customTo)}`
+  }, [customFrom, customTo])
+
+  const period = useMemo(() => {
+    if (periodId === "custom") return { id: "custom" as PeriodKey, label: "Custom", factor: customFactor, label2: customLabel2 }
+    return PERIODS.find(p => p.id === periodId)!
+  }, [periodId, customFactor, customLabel2])
 
   return (
     <div className="p-6 max-w-5xl space-y-5">
@@ -595,7 +611,7 @@ function ReportsInner() {
       </div>
 
       {/* Period selector */}
-      <div className="flex gap-2 flex-wrap print:hidden">
+      <div className="flex gap-2 flex-wrap items-center print:hidden">
         {PERIODS.map(p => (
           <button key={p.id} onClick={() => setPeriodId(p.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -609,6 +625,28 @@ function ReportsInner() {
             </span>
           </button>
         ))}
+        {/* Custom range pill */}
+        <button onClick={() => setPeriodId("custom")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            periodId === "custom"
+              ? "bg-primary text-primary-foreground"
+              : "bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          }`}>
+          Custom
+          {periodId === "custom" && (
+            <span className="ml-1.5 text-primary-foreground/70">{customLabel2}</span>
+          )}
+        </button>
+        {/* Custom date inputs — only visible when custom selected */}
+        {periodId === "custom" && (
+          <div className="flex items-center gap-2 ml-1">
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50" />
+          </div>
+        )}
       </div>
 
       {/* Report type selector */}

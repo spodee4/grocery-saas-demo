@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
+import * as XLSX from "xlsx"
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-// Parse a CSV string into rows/columns
 function parseCSV(text: string): string[][] {
   const lines = text.trim().split(/\r?\n/)
   return lines.map(line => {
@@ -31,21 +31,28 @@ export async function POST(req: NextRequest) {
   const file = fd.get("file") as File | null
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 })
 
-  const isCSV = file.name.endsWith(".csv") || file.type === "text/csv"
-  if (!isCSV) {
-    // For .xlsx files, ask user to save as CSV for now
-    return NextResponse.json({ error: "Please save the spreadsheet as CSV (.csv) and re-upload. Excel (.xlsx) direct import coming soon." }, { status: 415 })
+  const name = file.name.toLowerCase()
+  let rows: string[][]
+
+  if (name.endsWith(".csv") || file.type === "text/csv") {
+    const text = await file.text()
+    rows = parseCSV(text)
+  } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+    const buffer = await file.arrayBuffer()
+    const wb = XLSX.read(buffer, { type: "array" })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: "" })
+    rows = raw.map(r => r.map(v => String(v ?? "")))
+  } else {
+    return NextResponse.json({ error: "Upload a .csv, .xlsx, or .xls file" }, { status: 415 })
   }
 
-  const text = await file.text()
-  const rows = parseCSV(text)
   if (rows.length < 2) return NextResponse.json({ error: "File appears empty" }, { status: 400 })
 
   const headers = rows[0]
-  const sampleRows = rows.slice(1, 6) // first 5 data rows for preview
+  const sampleRows = rows.slice(1, 6)
 
-  // Ask Claude to map columns to invoice fields
-  const prompt = `You are analyzing a vendor invoice spreadsheet exported as CSV from a grocery distributor (like URM, Sysco, McLane, UNFI, Frito-Lay, Coca-Cola, etc.).
+  const prompt = `You are analyzing a vendor invoice spreadsheet from a grocery distributor (URM, Sysco, McLane, UNFI, Frito-Lay, Coca-Cola, etc.).
 
 Headers (column names, 0-indexed):
 ${headers.map((h, i) => `  Col ${i}: "${h}"`).join("\n")}
