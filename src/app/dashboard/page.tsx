@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Suspense } from "react"
 import Link from "next/link"
 import { BarChart, Bar, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts"
@@ -28,11 +28,28 @@ function delta(curr: number, prior: number) {
   return { label: `${sign}${pct.toFixed(1)}%`, positive: pct >= 0 }
 }
 
-function KPICard({ label, value, sub, deltaLabel, positive }: {
+function ChatButton({ prompt, storeId, className = "" }: { prompt: string; storeId: string; className?: string }) {
+  const router = useRouter()
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); e.preventDefault(); router.push(`/chat?store=${storeId}&init=${encodeURIComponent(prompt)}`) }}
+      title="Ask AI about this"
+      className={`p-1 rounded-md text-muted-foreground/30 hover:text-primary hover:bg-primary/10 transition-colors ${className}`}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  )
+}
+
+function KPICard({ label, value, sub, deltaLabel, positive, chatPrompt, storeId }: {
   label: string; value: string; sub?: string; deltaLabel?: string; positive?: boolean
+  chatPrompt?: string; storeId?: string
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-1">
+    <div className="relative bg-card border border-border rounded-lg p-5 shadow-sm space-y-1">
+      {chatPrompt && storeId && <ChatButton prompt={chatPrompt} storeId={storeId} className="absolute top-2.5 right-2.5" />}
       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-semibold tabular-nums">{value}</p>
       <div className="flex items-center gap-2">
@@ -196,30 +213,14 @@ function DashboardInner() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard
-          label="Weekly Sales"
-          value={fmt$(store.weekly_sales)}
-          deltaLabel={salesDelta.label}
-          positive={salesDelta.positive}
-          sub="vs prior week"
-        />
-        <KPICard
-          label="Gross Profit"
-          value={fmt$(store.weekly_gm)}
-          deltaLabel={fmtPct(store.weekly_gm_pct)}
-          positive={true}
-          sub="margin"
-        />
-        <KPICard
-          label="Transactions"
-          value={store.transactions.toLocaleString()}
-          sub="this week"
-        />
-        <KPICard
-          label="Avg Basket"
-          value={`$${store.avg_basket.toFixed(2)}`}
-          sub="per transaction"
-        />
+        <KPICard label="Weekly Sales" value={fmt$(store.weekly_sales)} deltaLabel={salesDelta.label} positive={salesDelta.positive} sub="vs prior week"
+          storeId={storeId} chatPrompt={`My store ${store.name} had weekly sales of ${fmt$(store.weekly_sales)}, which is ${salesDelta.label} vs last week ($${store.prior_weekly_sales.toLocaleString()}). Analyze this performance and ask me 3 targeted questions to help diagnose what's driving the change.`} />
+        <KPICard label="Gross Profit" value={fmt$(store.weekly_gm)} deltaLabel={fmtPct(store.weekly_gm_pct)} positive={true} sub="margin"
+          storeId={storeId} chatPrompt={`My gross profit this week is ${fmt$(store.weekly_gm)} at ${fmtPct(store.weekly_gm_pct)} margin for ${store.name}. My top departments by GM% are: ${store.departments.slice().sort((a,b)=>b.gm_pct-a.gm_pct).slice(0,3).map(d=>`${d.dept} ${fmtPct(d.gm_pct)}`).join(', ')}. Is this healthy for an independent grocery? What should I be watching? Ask me 3 questions to dig deeper.`} />
+        <KPICard label="Transactions" value={store.transactions.toLocaleString()} sub="this week"
+          storeId={storeId} chatPrompt={`${store.name} had ${store.transactions.toLocaleString()} transactions this week with an average basket of $${store.avg_basket.toFixed(2)}. What do these numbers tell me about customer behavior and store traffic? Ask me 3 questions to understand the patterns better.`} />
+        <KPICard label="Avg Basket" value={`$${store.avg_basket.toFixed(2)}`} sub="per transaction"
+          storeId={storeId} chatPrompt={`My average basket size is $${store.avg_basket.toFixed(2)} across ${store.transactions.toLocaleString()} transactions at ${store.name}. How does this compare to typical independent grocery benchmarks? What strategies could increase basket size? Ask me 3 questions first to understand my situation.`} />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -231,19 +232,20 @@ function DashboardInner() {
               const txns = SUSPICIOUS_TXN[storeId] ?? SUSPICIOUS_TXN.lakes
               const highCount = txns.filter(t => t.severity === "high").length
               return (
-                <button
-                  onClick={() => setSuspiciousOpen(true)}
-                  className="text-left bg-card border border-destructive/30 rounded-lg px-4 py-3 shadow-sm hover:border-destructive/60 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Suspicious Txns</p>
-                    {highCount > 0 && (
-                      <span className="text-[10px] font-bold bg-destructive text-white px-1.5 py-0.5 rounded-full">{highCount} HIGH</span>
-                    )}
-                  </div>
-                  <p className="text-2xl font-bold tabular-nums text-destructive mt-1">{txns.length}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">flagged this week · tap to review →</p>
-                </button>
+                <div className="relative bg-card border border-destructive/30 rounded-lg px-4 py-3 shadow-sm">
+                  <ChatButton storeId={storeId} className="absolute top-2 right-2"
+                    prompt={`I have ${txns.length} suspicious transactions flagged this week at ${store.name}, including ${highCount} HIGH severity. Types include: ${[...new Set(txns.map(t=>t.type))].join(', ')}. The most flagged cashier appears multiple times. What actions should I take immediately? Ask me 3 questions to understand the risk and whether this is a training issue, pricing error, or potential theft.`} />
+                  <button onClick={() => setSuspiciousOpen(true)} className="text-left w-full">
+                    <div className="flex items-center justify-between pr-6">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Suspicious Txns</p>
+                      {highCount > 0 && (
+                        <span className="text-[10px] font-bold bg-destructive text-white px-1.5 py-0.5 rounded-full">{highCount} HIGH</span>
+                      )}
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums text-destructive mt-1">{txns.length}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">flagged this week · tap to review →</p>
+                  </button>
+                </div>
               )
             })()}
 
@@ -254,7 +256,9 @@ function DashboardInner() {
               const pacedVsPrior = delta(paced, store.prior_weekly_sales)
               const progress = Math.min((DAY / 7) * 100, 100)
               return (
-                <div className="bg-card border border-border rounded-lg px-4 py-3 shadow-sm">
+                <div className="relative bg-card border border-border rounded-lg px-4 py-3 shadow-sm">
+                  <ChatButton storeId={storeId} className="absolute top-2 right-2"
+                    prompt={`${store.name} is tracking ${fmt$(paced)} for the week (Day ${DAY} of 7), which is ${pacedVsPrior.label} vs last week's ${fmt$(store.prior_weekly_sales)}. The week is now complete. Analyze this pacing and ask me 3 questions to help understand what drove the ${pacedVsPrior.positive ? "improvement" : "shortfall"} and what I should do differently next week.`} />
                   <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Week Pacing</p>
                   <p className="text-2xl font-bold tabular-nums mt-1">{fmt$(paced)}</p>
                   <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -273,10 +277,14 @@ function DashboardInner() {
           </div>
 
           {/* Trend chart — flex-1 fills remaining height */}
-          <div className="bg-card border border-border rounded-lg p-4 shadow-sm flex-1 flex flex-col min-h-0">
+          <div className="relative bg-card border border-border rounded-lg p-4 shadow-sm flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium">6-Week Sales Trend</p>
-              <span className="text-xs text-muted-foreground">Weekly</span>
+              <div className="flex items-center gap-2">
+                <ChatButton storeId={storeId}
+                  prompt={`Here is my 6-week sales trend for ${store.name}: ${store.weekly_trend.map(w=>`${w.week}: $${(w.sales/1000).toFixed(1)}K`).join(', ')}. Analyze this trend — identify patterns, dips, and peaks. Ask me 3 questions to understand what external or operational factors are driving the shape of this curve.`} />
+                <span className="text-xs text-muted-foreground">Weekly</span>
+              </div>
             </div>
             <div className="flex-1 min-h-[80px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -301,22 +309,24 @@ function DashboardInner() {
         {/* Alerts column */}
         <div className="space-y-3">
           {/* Allowance alert */}
-          <Link href={`/finance/allowances?store=${storeId}`} className="block">
-            <div className="bg-card border border-secondary/40 rounded-lg p-4 shadow-sm hover:border-secondary/70 transition-colors">
-              <div className="flex items-start gap-2">
-                <span className="text-secondary text-lg leading-none">⚡</span>
-                <div>
-                  <p className="text-sm font-medium">Unclaimed Allowances</p>
-                  <p className="text-xl font-semibold text-secondary tabular-nums mt-0.5">${store.allowances.gap.toLocaleString()}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Left on the table this week → View breakdown</p>
-                </div>
+          <div className="relative bg-card border border-secondary/40 rounded-lg p-4 shadow-sm hover:border-secondary/70 transition-colors">
+            <ChatButton storeId={storeId} className="absolute top-2 right-2"
+              prompt={`I have $${store.allowances.gap.toLocaleString()} in unclaimed vendor allowances this week at ${store.name}. Total earned: $${store.allowances.allowances_earned.toLocaleString()}, applied: $${store.allowances.allowances_applied.toLocaleString()}. My top vendors by purchase volume are: ${store.allowances.vendors.slice(0,3).map(v=>`${v.vendor} ($${v.purchases.toLocaleString()})`).join(', ')}. How do I recover this money and prevent it from happening again? Ask me 3 questions first.`} />
+            <Link href={`/finance/allowances?store=${storeId}`} className="flex items-start gap-2">
+              <span className="text-secondary text-lg leading-none">⚡</span>
+              <div>
+                <p className="text-sm font-medium">Unclaimed Allowances</p>
+                <p className="text-xl font-semibold text-secondary tabular-nums mt-0.5">${store.allowances.gap.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">Left on the table this week → View breakdown</p>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
 
           {/* Invoice status */}
-          <Link href={`/invoices?store=${storeId}`} className="block">
-            <div className="bg-card border border-border rounded-lg p-4 shadow-sm hover:border-primary/40 transition-colors">
+          <div className="relative bg-card border border-border rounded-lg p-4 shadow-sm hover:border-primary/40 transition-colors">
+            <ChatButton storeId={storeId} className="absolute top-2 right-2"
+              prompt={`I have ${store.recent_invoices.length} invoices this week totaling ${fmt$(store.recent_invoices.reduce((s,i)=>s+i.amount,0))} at ${store.name}. ${pendingInvoices > 0 ? `${pendingInvoices} are still pending.` : "All are paid or clear."} Vendors this week: ${[...new Set(store.recent_invoices.map(i=>i.vendor))].join(', ')}. What should I be reviewing in my invoice workflow? Ask me 3 questions about my payables health.`} />
+            <Link href={`/invoices?store=${storeId}`} className="block">
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Invoices</p>
               <p className="text-sm mt-1">
                 <span className="font-semibold">{store.recent_invoices.length}</span> this week ·{" "}
@@ -327,11 +337,13 @@ function DashboardInner() {
                 )}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{fmt$(store.recent_invoices.reduce((s, i) => s + i.amount, 0))} total purchases</p>
-            </div>
-          </Link>
+            </Link>
+          </div>
 
           {/* Margin health */}
-          <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+          <div className="relative bg-card border border-border rounded-lg p-4 shadow-sm">
+            <ChatButton storeId={storeId} className="absolute top-2 right-2"
+              prompt={`Here is the margin health for ${store.name} this week: ${store.departments.map(d=>`${d.dept} ${fmtPct(d.gm_pct)}`).join(', ')}. Identify which departments are concerning and which are strong. What benchmarks should I be comparing against for an independent grocery? Ask me 3 questions to understand what's driving the margin gaps.`} />
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-2">Margin Health</p>
             {store.departments.slice(0, 3).map(d => (
               <div key={d.dept} className="flex items-center justify-between mb-1.5">
@@ -356,8 +368,12 @@ function DashboardInner() {
 
 
       {/* Dept breakdown chart */}
-      <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
-        <p className="text-sm font-medium mb-4">Department Sales — This Week</p>
+      <div className="relative bg-card border border-border rounded-lg p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-medium">Department Sales — This Week</p>
+          <ChatButton storeId={storeId}
+            prompt={`Here are my department sales for ${store.name} this week, with week-over-week change: ${sortedDepts.map(d=>`${d.dept}: ${fmt$(d.sales)} (${d.wow_pct>=0?'+':''}${d.wow_pct.toFixed(1)}% WoW)`).join(', ')}. Which departments need attention? Which are outperforming? Ask me 3 questions to understand the drivers behind the biggest movers.`} />
+        </div>
         <div className="space-y-2.5">
           {sortedDepts.map(d => {
             const pct = (d.sales / totalWeekSales) * 100
@@ -384,7 +400,11 @@ function DashboardInner() {
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <p className="text-sm font-medium">Department Summary</p>
-          <Link href={`/finance/pnl?store=${storeId}`} className="text-xs text-primary hover:underline">Full P&L →</Link>
+          <div className="flex items-center gap-3">
+            <ChatButton storeId={storeId}
+              prompt={`Here is the full department P&L summary for ${store.name} this week: ${store.departments.map(d=>`${d.dept}: Sales ${fmt$(d.sales)}, GP ${fmt$(d.gm_dollars)} (${fmtPct(d.gm_pct)}), WoW ${d.wow_pct>=0?'+':''}${d.wow_pct.toFixed(1)}%`).join(' | ')}. Which departments have the most opportunity for improvement? Where should I be focused? Ask me 3 specific questions to build an action plan.`} />
+            <Link href={`/finance/pnl?store=${storeId}`} className="text-xs text-primary hover:underline">Full P&L →</Link>
+          </div>
         </div>
         <table className="w-full text-sm">
           <thead>

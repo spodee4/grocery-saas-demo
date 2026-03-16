@@ -138,14 +138,26 @@ function ChatInner() {
   const storeId = params.get("store") ?? "lakes"
   const store = STORES[storeId] ?? STORES.lakes
 
+  const initPrompt = params.get("init")
+
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const initSentRef = useRef(false)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages])
+
+  // Auto-send init prompt from dashboard chat buttons
+  useEffect(() => {
+    if (initPrompt && !initSentRef.current) {
+      initSentRef.current = true
+      send(initPrompt)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Text chat
   async function send(text: string) {
