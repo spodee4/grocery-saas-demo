@@ -589,6 +589,105 @@ function InvoiceLibrary({ storeId }: { storeId: string }) {
   )
 }
 
+// ─── Vendor template system ───────────────────────────────────────────────────
+
+type VendorTemplate = {
+  vendor: string
+  version: number
+  layout_signature: string
+  field_map: Record<string, { x: number; y: number }>
+  last_used: string
+  created: string
+}
+
+type TemplateStatus =
+  | { state: "new";     vendor: string; signature: string }
+  | { state: "match";   vendor: string; version: number; last_used: string }
+  | { state: "changed"; vendor: string; version: number; changed_fields: string[]; signature: string }
+
+const TEMPLATE_KEY = "si_vendor_templates_v1"
+
+function bucketCoord(n: number, bucket: number) { return Math.round(n / bucket) * bucket }
+
+function bboxCenter(bbox: BBox): { x: number; y: number } | null {
+  if (!bbox) return null
+  return { x: (bbox[0] + bbox[2]) / 2, y: (bbox[1] + bbox[3]) / 2 }
+}
+
+function buildLayoutSignature(result: OCRResult): string {
+  const BUCKET_X = 50, BUCKET_Y = 30
+  const parts: string[] = []
+  const fields = ["vendor", "invoice_number", "invoice_date", "total"] as const
+  for (const f of fields) {
+    const fv = result[f] as FieldVal | undefined
+    if (fv?.bbox) {
+      const c = bboxCenter(fv.bbox)
+      if (c) parts.push(`${f}:x${bucketCoord(c.x, BUCKET_X)}y${bucketCoord(c.y, BUCKET_Y)}`)
+    }
+  }
+  const li0 = result.line_items?.[0]
+  if (li0?.bbox) {
+    const c = bboxCenter(li0.bbox)
+    if (c) parts.push(`li0:x${bucketCoord(c.x, BUCKET_X)}y${bucketCoord(c.y, BUCKET_Y)}`)
+  }
+  return parts.join(",")
+}
+
+function parseSignatureMap(sig: string): Record<string, string> {
+  const map: Record<string, string> = {}
+  sig.split(",").forEach(part => {
+    const idx = part.indexOf(":")
+    if (idx > 0) map[part.slice(0, idx)] = part.slice(idx + 1)
+  })
+  return map
+}
+
+function compareSignatures(stored: string, current: string): string[] {
+  const storedMap = parseSignatureMap(stored)
+  const currentMap = parseSignatureMap(current)
+  return Object.keys(currentMap).filter(k => storedMap[k] && storedMap[k] !== currentMap[k])
+}
+
+function buildFieldMap(result: OCRResult): Record<string, { x: number; y: number }> {
+  const map: Record<string, { x: number; y: number }> = {}
+  const fields = ["vendor", "invoice_number", "invoice_date", "total", "store_delivered_to"] as const
+  for (const f of fields) {
+    const fv = result[f] as FieldVal | undefined
+    const c = fv?.bbox ? bboxCenter(fv.bbox) : null
+    if (c) map[f] = c
+  }
+  return map
+}
+
+function getAllTemplates(): Record<string, VendorTemplate> {
+  if (typeof window === "undefined") return {}
+  try { return JSON.parse(localStorage.getItem(TEMPLATE_KEY) ?? "{}") } catch { return {} }
+}
+
+function getTemplate(vendor: string): VendorTemplate | null {
+  return getAllTemplates()[vendor.toLowerCase()] ?? null
+}
+
+function saveTemplate(vendor: string, signature: string, fieldMap: Record<string, { x: number; y: number }>, existingVersion?: number) {
+  const all = getAllTemplates()
+  const key = vendor.toLowerCase()
+  const now = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  all[key] = {
+    vendor,
+    version: (existingVersion ?? 0) + 1,
+    layout_signature: signature,
+    field_map: fieldMap,
+    last_used: now,
+    created: all[key]?.created ?? now,
+  }
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(all))
+}
+
+const FIELD_LABEL_MAP: Record<string, string> = {
+  vendor: "Vendor", invoice_number: "Invoice #", invoice_date: "Date",
+  total: "Total", li0: "First Line Item",
+}
+
 // ─── OCR Scanner ─────────────────────────────────────────────────────────────
 
 function OCRScanner({ storeId }: { storeId: string }) {
@@ -597,6 +696,8 @@ function OCRScanner({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<OCRResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [templateStatus, setTemplateStatus] = useState<TemplateStatus | null>(null)
+  const [templateSaved, setTemplateSaved] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addFiles = useCallback((files: FileList | File[]) => {
@@ -617,20 +718,48 @@ function OCRScanner({ storeId }: { storeId: string }) {
 
   async function handleSubmit() {
     if (pages.length === 0) return
-    setLoading(true); setError(null); setResult(null)
+    setLoading(true); setError(null); setResult(null); setTemplateStatus(null); setTemplateSaved(false)
     try {
       const fd = new FormData()
       pages.forEach((p, i) => fd.append(`file_${i}`, p.file))
       fd.append("store", storeId)
       const res = await fetch("/api/ocr", { method: "POST", body: fd })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setResult(await res.json())
+      const data: OCRResult = await res.json()
+      setResult(data)
       setActivePageIdx(0)
+
+      // Template detection
+      const vendor = String(data.vendor?.value ?? "").trim()
+      if (vendor) {
+        const sig = buildLayoutSignature(data)
+        const stored = getTemplate(vendor)
+        if (!stored) {
+          setTemplateStatus({ state: "new", vendor, signature: sig })
+        } else {
+          const changed = compareSignatures(stored.layout_signature, sig)
+          if (changed.length === 0) {
+            setTemplateStatus({ state: "match", vendor, version: stored.version, last_used: stored.last_used })
+          } else {
+            setTemplateStatus({ state: "changed", vendor, version: stored.version, changed_fields: changed, signature: sig })
+          }
+        }
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "OCR failed")
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleConfirmTemplate() {
+    if (!result || !templateStatus) return
+    const vendor = templateStatus.vendor
+    const sig = templateStatus.state !== "match" ? templateStatus.signature : buildLayoutSignature(result)
+    const fieldMap = buildFieldMap(result)
+    const existingVersion = templateStatus.state !== "new" ? templateStatus.version : undefined
+    saveTemplate(vendor, sig, fieldMap, existingVersion)
+    setTemplateSaved(true)
   }
 
   const activePreview = pages[activePageIdx]?.preview ?? null
@@ -703,6 +832,93 @@ function OCRScanner({ storeId }: { storeId: string }) {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       </div>
+
+      {/* Template status banner */}
+      {templateStatus && !templateSaved && (
+        <div className={`rounded-xl border px-5 py-4 flex items-start gap-4 ${
+          templateStatus.state === "match"   ? "bg-primary/5 border-primary/30" :
+          templateStatus.state === "changed" ? "bg-amber-500/10 border-amber-500/30" :
+                                               "bg-blue-500/10 border-blue-500/30"
+        }`}>
+          {/* Icon */}
+          <div className={`mt-0.5 shrink-0 ${
+            templateStatus.state === "match" ? "text-primary" :
+            templateStatus.state === "changed" ? "text-amber-500" : "text-blue-400"
+          }`}>
+            {templateStatus.state === "match" ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" /></svg>
+            ) : templateStatus.state === "changed" ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinecap="round" /></svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" /></svg>
+            )}
+          </div>
+
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            {templateStatus.state === "match" && (
+              <>
+                <p className="text-sm font-semibold text-primary">
+                  Template matched — {templateStatus.vendor} (v{templateStatus.version})
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  All field positions verified · Last used {templateStatus.last_used} · No action needed
+                </p>
+              </>
+            )}
+            {templateStatus.state === "changed" && (
+              <>
+                <p className="text-sm font-semibold text-amber-500">
+                  Layout change detected — {templateStatus.vendor} (v{templateStatus.version})
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {templateStatus.changed_fields.length} field{templateStatus.changed_fields.length !== 1 ? "s" : ""} shifted:{" "}
+                  <span className="text-foreground font-medium">
+                    {templateStatus.changed_fields.map(f => FIELD_LABEL_MAP[f] ?? f).join(", ")}
+                  </span>
+                  {" "}· Review the overlay and re-confirm to update the template
+                </p>
+              </>
+            )}
+            {templateStatus.state === "new" && (
+              <>
+                <p className="text-sm font-semibold text-blue-400">
+                  New vendor: {templateStatus.vendor}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  No template on file. Confirm the field mapping below to save — future scans will auto-verify against this layout.
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Action button */}
+          {templateStatus.state !== "match" && (
+            <button
+              onClick={handleConfirmTemplate}
+              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors ${
+                templateStatus.state === "changed"
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-400 hover:bg-amber-500/30"
+                  : "bg-blue-500/20 border-blue-500/40 text-blue-400 hover:bg-blue-500/30"
+              }`}
+            >
+              {templateStatus.state === "changed" ? "Re-confirm Template" : "Save Template"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Template saved confirmation */}
+      {templateSaved && templateStatus && (
+        <div className="rounded-xl border bg-primary/5 border-primary/30 px-5 py-3 flex items-center gap-3">
+          <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" /></svg>
+          <p className="text-sm text-primary font-medium">
+            {templateStatus.state === "changed"
+              ? `${templateStatus.vendor} template updated to v${templateStatus.version + 1}`
+              : `${templateStatus.vendor} template saved — future scans will auto-verify`}
+          </p>
+        </div>
+      )}
 
       {/* Results */}
       {result && (
