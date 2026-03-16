@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Space_Mono } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
 import { BottomNav } from "@/components/BottomNav"
+import { CoachChat } from "@/components/CoachChat"
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -17,10 +18,10 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "JC Coach",
-  description: "Personal training coach dashboard",
+  title: "John Coach",
+  description: "John's personal health & training coach",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "JC Coach" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "John Coach" },
 }
 
 export const viewport: Viewport = {
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="max-w-md mx-auto min-h-screen flex flex-col relative">
             <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
             <BottomNav />
+            <CoachChat />
           </div>
         </Providers>
       </body>

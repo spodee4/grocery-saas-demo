@@ -1,13 +1,34 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { getSession } from "@/lib/session"
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { join } from "path"
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const API_URL = process.env.COACH_API_URL || ""
 const API_TOKEN = process.env.COACH_API_TOKEN || ""
 
-// Cache keyed by week start (Monday)
+// File-based cache — persists across server restarts
+const CACHE_DIR = join(process.env.HOME || "/tmp", ".jc-coach-cache")
+function getCachePath(weekStart: string) {
+  return join(CACHE_DIR, `meals-${weekStart}.json`)
+}
+function readFileCache(weekStart: string): WeeklyMealPlan | null {
+  try {
+    const path = getCachePath(weekStart)
+    if (!existsSync(path)) return null
+    return JSON.parse(readFileSync(path, "utf-8"))
+  } catch { return null }
+}
+function writeFileCache(weekStart: string, plan: WeeklyMealPlan) {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true })
+    writeFileSync(getCachePath(weekStart), JSON.stringify(plan))
+  } catch {}
+}
+
+// In-memory cache (fast path, cleared on restart — file cache handles restart)
 const mealCache = new Map<string, { plan: WeeklyMealPlan; ts: number }>()
 
 export interface DayMeals {
@@ -67,9 +88,19 @@ export async function GET(req: NextRequest) {
   const weekStart = getWeekStart()
   const force = req.nextUrl.searchParams.get("force") === "1"
 
+  // Check in-memory cache first (fast path)
   const cached = mealCache.get(weekStart)
   if (cached && !force && Date.now() - cached.ts < 12 * 60 * 60 * 1000) {
     return NextResponse.json(cached.plan)
+  }
+
+  // Check file cache — persists across server restarts, valid all week
+  if (!force) {
+    const fileCached = readFileCache(weekStart)
+    if (fileCached) {
+      mealCache.set(weekStart, { plan: fileCached, ts: Date.now() })
+      return NextResponse.json(fileCached)
+    }
   }
 
   // Get trends to know training days
@@ -128,6 +159,13 @@ Days: ${weekDays.map(d => d.day + " " + d.date).join(", ")}
 - Keep processed food minimal
 - WEIGHT LOSS CONTEXT: John wants to lose body fat while fueling training. Every day should have a slight caloric deficit from TDEE except long run days. Rest days most deficit-focused. Never sacrifice protein (180-200g min always).
 
+## FAMILY CONTEXT (dinners feed everyone)
+- John's family: Tullaya (wife, 47F, 130 lb), Kai (son, 12M, 105 lb), Mika (daughter, 10F, 50 lb — smallest eater)
+- Dinners should be family-friendly meals that everyone eats — NOT athlete-specific
+- Shopping list quantities should reflect feeding 4 people at dinner (3-4 servings beyond John's portion)
+- Keep dinners simple: 30 min or less, real food, kid-friendly
+- Good family dinners: grilled chicken + rice + veggies, tacos, pasta, salmon, stir-fry, burgers
+
 ## INSTRUCTIONS
 Return ONLY a JSON object with this schema:
 
@@ -156,31 +194,44 @@ Return ONLY a JSON object with this schema:
     }
     // repeat for all 7 days
   ],
-  "shopping_list": ["item 1 with quantity e.g. 'Chicken breast, 3 lb'", ...20 items total],
+  "shopping_list": ["item with family quantity e.g. 'Chicken breast, 5 lb (family dinners + John lunches)'", ...20 items total],
   "meal_prep_tips": ["tip 1 e.g. 'Cook 3 cups rice Sunday for Mon-Wed lunches'", ...4 tips]
 }`
 
-  try {
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 8000,
-      messages: [{ role: "user", content: prompt }],
-    })
-
-    const text = (message.content[0] as any).text.trim()
-    const jsonStr = text.replace(/^```json?\n?/, "").replace(/\n?```$/, "")
-    const parsed = JSON.parse(jsonStr)
-
-    const plan: WeeklyMealPlan = {
-      generated_at: new Date().toISOString(),
-      week_start: weekStart,
-      ...parsed,
-    }
-
-    mealCache.set(weekStart, { plan, ts: Date.now() })
-    return NextResponse.json(plan)
-  } catch (e) {
-    console.error("Weekly meal plan failed:", e)
-    return NextResponse.json({ error: "Failed to generate meal plan" }, { status: 500 })
+  const parseResponse = (text: string) => {
+    const start = text.indexOf("{")
+    const end = text.lastIndexOf("}")
+    if (start === -1 || end === -1) throw new Error("No JSON object found")
+    return JSON.parse(text.slice(start, end + 1))
   }
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const message = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 8000,
+        messages: [{ role: "user", content: prompt }],
+      })
+
+      const text = (message.content[0] as any).text
+      const parsed = parseResponse(text)
+
+      const plan: WeeklyMealPlan = {
+        generated_at: new Date().toISOString(),
+        week_start: weekStart,
+        ...parsed,
+      }
+
+      mealCache.set(weekStart, { plan, ts: Date.now() })
+      writeFileCache(weekStart, plan)
+      return NextResponse.json(plan)
+    } catch (e) {
+      console.error(`Weekly meal plan attempt ${attempt} failed:`, e)
+      if (attempt === 2) {
+        return NextResponse.json({ error: "Failed to generate meal plan" }, { status: 500 })
+      }
+    }
+  }
+
+  return NextResponse.json({ error: "Failed to generate meal plan" }, { status: 500 })
 }

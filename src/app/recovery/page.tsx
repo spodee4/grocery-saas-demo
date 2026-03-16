@@ -95,6 +95,19 @@ export default function RecoveryPage() {
         </div>
       </div>
 
+      {!isLoading && !data.some((d: any) => d.hrv_last_night || d.sleep_seconds || d.body_battery_wake) && (
+        <div className="bg-card rounded-2xl p-4 space-y-2 border border-border">
+          <p className="text-sm font-medium text-foreground">Recovery data syncing</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Heart Rate Variability (HRV), sleep, and body battery pull from Garmin via the Mac mini enrichment pipeline.
+            Data will appear here once the nightly sync (5–6 AM) runs and writes to coach.db.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Once active, you'll see HRV trends, sleep quality, and body battery charts across 14–60 day windows.
+          </p>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-card rounded-2xl animate-pulse" />)}

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchDashboard } from "@/lib/api"
 import type { DashboardData } from "@/lib/api"
 import { CoachBrief } from "@/components/CoachBrief"
+import { LifeContext } from "@/components/LifeContext"
 import { Tooltip, MetricCard, DEFS, ctlInsight, atlInsight, tsbInsight, acwrInsight, vo2Insight } from "@/components/Tooltip"
 
 function fmt(v: number | null | undefined, digits = 0): string {
@@ -147,6 +148,7 @@ export default function TodayPage() {
       </div>
 
       {/* Coach Brief — daily plan, analysis, nutrition */}
+      <LifeContext />
       <CoachBrief />
 
       {/* Divider */}

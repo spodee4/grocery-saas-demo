@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { CoachBrief } from "@/app/api/brief/route"
 
@@ -45,7 +46,82 @@ function MacroBar({ carbs, protein, fat, target }: { carbs: number; protein: num
   )
 }
 
+function WeeklyFocusCard({ focus }: { focus: CoachBrief["weekly_focus"] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="bg-card rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full p-4 text-left flex items-center justify-between"
+      >
+        <div>
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Weekly Focus</p>
+          <p className="font-semibold text-sm mt-0.5 text-primary">{focus.headline}</p>
+        </div>
+        <span className={`text-muted-foreground text-sm transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}>
+          ↓
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 border-t border-border pt-3">
+          {/* Where we are / going */}
+          <div className="space-y-2">
+            <div className="border-l-2 border-muted pl-3">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Where We Are</p>
+              <p className="text-xs text-foreground/80 leading-relaxed">{focus.where_we_are}</p>
+            </div>
+            <div className="border-l-2 border-primary/50 pl-3">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Where We're Going</p>
+              <p className="text-xs text-foreground/80 leading-relaxed">{focus.where_we_go}</p>
+            </div>
+          </div>
+
+          {/* This week */}
+          <div>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">This Week</p>
+            <div className="space-y-1.5">
+              {focus.this_week?.map((bullet, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className="text-primary font-bold text-xs shrink-0 mt-px">·</span>
+                  <p className="text-xs text-foreground/80 leading-relaxed">{bullet}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Upcoming weeks */}
+          {focus.upcoming?.length > 0 && (
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Lookahead</p>
+              <div className="space-y-3">
+                {focus.upcoming.map((week, i) => (
+                  <div key={i} className="border border-border rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold">{week.label}</span>
+                      <span className="text-[10px] text-accent font-medium">{week.theme}</span>
+                    </div>
+                    {week.bullets?.map((b, j) => (
+                      <div key={j} className="flex gap-2 items-start">
+                        <span className="text-muted-foreground text-xs shrink-0">→</span>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{b}</p>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CoachBrief() {
+  const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [alertsOpen, setAlertsOpen] = useState(true)
   const { data: brief, isLoading, isError, refetch, isFetching } = useQuery<CoachBrief>({
     queryKey: ["brief"],
     queryFn: () => fetchBrief(),
@@ -174,7 +250,28 @@ export function CoachBrief() {
             </div>
           </>
         )}
+
+        {brief.daily_challenge && (
+          <>
+            <div className="border-t border-border" />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Daily Challenge</p>
+                <span className="text-xs text-muted-foreground">{brief.daily_challenge.timing}</span>
+              </div>
+              <p className="font-bold text-primary">{brief.daily_challenge.name}</p>
+              <p className="text-sm text-foreground/80">{brief.daily_challenge.description}</p>
+              <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-mono font-medium">
+                {brief.daily_challenge.sets_reps}
+              </span>
+              <p className="text-xs text-muted-foreground">{brief.daily_challenge.why}</p>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Weekly Focus — collapsible */}
+      {brief.weekly_focus && <WeeklyFocusCard focus={brief.weekly_focus} />}
 
       {/* Tomorrow preview */}
       <div className="bg-card rounded-2xl p-4 flex items-center gap-4">
@@ -195,25 +292,49 @@ export function CoachBrief() {
 
       {/* Coaching analysis */}
       {brief.analysis && (
-        <div className="bg-card rounded-2xl p-4 space-y-2">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Coaching Notes</p>
-          <p className="text-sm text-foreground/80 leading-relaxed">{brief.analysis}</p>
-          {brief.workout_notes && (
-            <p className="text-sm text-muted-foreground leading-relaxed border-t border-border pt-2 mt-2">
-              {brief.workout_notes}
-            </p>
+        <div className="bg-card rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setAnalysisOpen(o => !o)}
+            className="w-full p-4 flex items-center justify-between"
+          >
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Coaching Notes</p>
+            <span className={`text-muted-foreground text-sm transition-transform duration-200 ${analysisOpen ? "rotate-180" : ""}`}>↓</span>
+          </button>
+          {analysisOpen && (
+            <div className="px-4 pb-4 space-y-2 border-t border-border pt-3">
+              <p className="text-sm text-foreground/80 leading-relaxed">{brief.analysis}</p>
+              {brief.workout_notes && (
+                <p className="text-sm text-muted-foreground leading-relaxed border-t border-border pt-2 mt-2">
+                  {brief.workout_notes}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
 
       {/* Alerts */}
       {brief.alerts?.length > 0 && (
-        <div className="space-y-2">
-          {brief.alerts.map((alert, i) => (
-            <div key={i} className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-2.5">
-              <p className="text-xs text-destructive font-medium">⚠ {alert}</p>
+        <div className="bg-destructive/10 border border-destructive/20 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setAlertsOpen(o => !o)}
+            className="w-full px-4 py-3 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-destructive text-sm">⚠</span>
+              <p className="text-xs font-medium text-destructive">
+                {brief.alerts.length} Alert{brief.alerts.length > 1 ? "s" : ""}
+              </p>
             </div>
-          ))}
+            <span className={`text-destructive/70 text-sm transition-transform duration-200 ${alertsOpen ? "rotate-180" : ""}`}>↓</span>
+          </button>
+          {alertsOpen && (
+            <div className="px-4 pb-3 space-y-2 border-t border-destructive/20 pt-2">
+              {brief.alerts.map((alert, i) => (
+                <p key={i} className="text-xs text-destructive leading-relaxed">· {alert}</p>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -248,25 +369,31 @@ export function CoachBrief() {
         )}
       </div>
 
-      {/* Daily challenge */}
-      {brief.daily_challenge && (
-        <div className="bg-card rounded-2xl p-4 space-y-2 border border-primary/20">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Daily Challenge</p>
-            <span className="text-xs text-muted-foreground">{brief.daily_challenge.timing}</span>
-          </div>
-          <p className="font-bold text-primary">{brief.daily_challenge.name}</p>
-          <p className="text-sm text-foreground/80">{brief.daily_challenge.description}</p>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-mono font-medium">
-              {brief.daily_challenge.sets_reps}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground border-t border-border pt-2">{brief.daily_challenge.why}</p>
+      {/* Daily Supplements */}
+      {brief.daily_supplements && (
+        <div className="bg-card rounded-2xl p-4 space-y-3">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Daily Supplements</p>
+          {brief.daily_supplements.note && (
+            <p className="text-xs text-muted-foreground italic">{brief.daily_supplements.note}</p>
+          )}
+          {[
+            { label: "With Lunch", items: brief.daily_supplements.morning },
+            { label: "Pre-Workout", items: brief.daily_supplements.pre_workout },
+            { label: "Post-Workout", items: brief.daily_supplements.post_workout },
+            { label: "Evening", items: brief.daily_supplements.evening },
+          ].filter(g => g.items?.length > 0).map(group => (
+            <div key={group.label} className="space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{group.label}</p>
+              {group.items.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className="text-primary text-xs shrink-0 mt-0.5">◈</span>
+                  <p className="text-xs text-foreground/80">{item}</p>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       )}
-
-
 
       {brief.generated_at && (
         <p className="text-[10px] text-muted-foreground text-center">

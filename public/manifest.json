@@ -1,7 +1,7 @@
 {
-  "name": "JC Coach",
+  "name": "John Coach",
   "short_name": "Coach",
-  "description": "Personal training coach dashboard",
+  "description": "John's personal health & training coach",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

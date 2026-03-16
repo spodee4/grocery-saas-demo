@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { getSession } from "@/lib/session"
+import { readLifeContext } from "@/app/api/life-context/route"
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -59,6 +60,24 @@ export interface CoachBrief {
     timing: string            // "At lunch" / "Morning" / "Evening"
     why: string               // why this builds toward race goal
   }
+  daily_supplements: {
+    morning: string[]       // e.g. ["Vitamin D3 5000 IU with breakfast", "Omega-3 2g"]
+    pre_workout: string[]   // e.g. ["Electrolytes 30 min before", "Beetroot/NO3"]
+    post_workout: string[]  // e.g. ["Magnesium glycinate 400mg", "Collagen peptides 10g"]
+    evening: string[]       // e.g. ["Magnesium glycinate 400mg for sleep"]
+    note: string            // one-line reason based on today's training
+  }
+  weekly_focus: {
+    headline: string          // e.g. "Week 1 of Build — Establish Aerobic Base"
+    where_we_are: string      // 1-2 sentences on current state
+    where_we_go: string       // 1-2 sentences on the goal ahead
+    this_week: string[]       // 3-4 actionable bullets for this week
+    upcoming: Array<{
+      label: string           // e.g. "Week 2 (Mar 23)"
+      theme: string           // e.g. "Base Building — +10% volume"
+      bullets: string[]       // 2-3 key focuses
+    }>
+  }
   analysis: string
   alerts: string[]
   workout_notes: string
@@ -94,8 +113,13 @@ export async function GET(req: NextRequest) {
   const body = dashboard?.body
   const lastWorkout = dashboard?.last_workout
   const weightLb = body?.weight_kg ? (body.weight_kg * 2.20462).toFixed(0) : "~179"
+  const lifeCtx = readLifeContext()
+  const lifeSection = lifeCtx.notes.length > 0
+    ? `\n## ATHLETE LIFE CONTEXT (critical — adjust ALL recommendations accordingly)\n${lifeCtx.notes.map(n => `- ${n}`).join("\n")}\n`
+    : ""
 
   const prompt = `You are a personal endurance running coach for John Akins II. Generate his daily training brief.
+${lifeSection}
 
 ## ATHLETE PROFILE
 - 100-mile ultra race: July 18, 2026 (${Math.ceil((new Date("2026-07-18").getTime() - Date.now()) / (7*24*60*60*1000))} weeks out)
@@ -152,6 +176,14 @@ Available: sauna, cold plunge, red light therapy, steam room
 - Less prep is better — simple, real food
 - Always spell out metric names fully (Chronic Training Load not CTL, etc.) in descriptions and analysis
 
+## SUPPLEMENT STACK (recommend daily based on training day type)
+- Foundation daily: Vitamin D3 5000 IU, Omega-3 2-3g, Magnesium glycinate 400mg (evening), Zinc 15mg
+- Training days: Electrolytes (sodium/potassium) pre-workout, Creatine monohydrate 5g daily
+- Recovery: Collagen peptides 10g post-workout (joint/tendon health for 100-mile training), Tart cherry extract on hard days
+- Sleep/recovery: Magnesium glycinate + ashwagandha on hard days or poor HRV nights
+- Endurance specific: Iron monitoring (endurance athletes commonly deficient), B12, CoQ10
+- Adjust recommendations based on: today's workout intensity, HRV status, recovery needs
+
 ## INSTRUCTIONS
 Respond with ONLY a JSON object. No markdown, no explanation:
 
@@ -195,6 +227,24 @@ Respond with ONLY a JSON object. No markdown, no explanation:
     "timing_tip": "specific timing advice — remember no breakfast, first meal is lunch",
     "meals": ["Pre-workout: ...", "Lunch (first meal): ...", "Afternoon snack or smoothie: ...", "Dinner: ..."]
   },
+  "daily_supplements": {
+    "morning": ["e.g. Vitamin D3 5000 IU with lunch (first meal)", "Omega-3 2g"],
+    "pre_workout": ["e.g. Electrolytes 30 min before run" — or empty array if rest day],
+    "post_workout": ["e.g. Creatine 5g + Collagen 10g in protein shake" — or empty array],
+    "evening": ["Magnesium glycinate 400mg before bed"],
+    "note": "one sentence: why these specific supplements matter today based on workout type and recovery status"
+  },
+  "weekly_focus": {
+    "headline": "e.g. 'Week 1 of Build — Establish Aerobic Base'",
+    "where_we_are": "1-2 sentences: current fitness state, where John stands right now relative to race goal",
+    "where_we_go": "1-2 sentences: what the next 4 weeks are building toward and why",
+    "this_week": ["3-4 specific actionable bullets for this week"],
+    "upcoming": [
+      { "label": "Week 2 (Mar 23)", "theme": "short theme name", "bullets": ["2-3 key focuses"] },
+      { "label": "Week 3 (Mar 30)", "theme": "short theme name", "bullets": ["2-3 key focuses"] },
+      { "label": "Week 4 (Apr 6)", "theme": "short theme name", "bullets": ["2-3 key focuses"] }
+    ]
+  },
   "analysis": "3-4 sentences coaching insight on fitness trajectory. Use full metric names: Chronic Training Load (CTL), Acute Training Load (ATL), Training Stress Balance (TSB), Heart Rate Variability (HRV). Be direct.",
   "alerts": ["alert if any — keep to real concerns only, empty array if none"],
   "workout_notes": "2-3 sentences on last workout pattern and what it means",
@@ -207,12 +257,14 @@ Respond with ONLY a JSON object. No markdown, no explanation:
   try {
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      max_tokens: 3000,
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = (message.content[0] as any).text.trim()
-    const jsonStr = text.replace(/^```json?\n?/, "").replace(/\n?```$/, "")
+    const text = (message.content[0] as any).text
+    const start = text.indexOf("{")
+    const end = text.lastIndexOf("}")
+    const jsonStr = start !== -1 && end !== -1 ? text.slice(start, end + 1) : text
     const parsed = JSON.parse(jsonStr)
 
     const brief: CoachBrief = { generated_at: new Date().toISOString(), ...parsed }

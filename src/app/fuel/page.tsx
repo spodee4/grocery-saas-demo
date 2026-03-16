@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { WeeklyMealPlan, DayMeals } from "@/app/api/weekly-meals/route"
 
@@ -152,6 +152,36 @@ function DayCard({ day, isToday }: { day: DayMeals; isToday: boolean }) {
 
 export default function FuelPage() {
   const today = new Date().toISOString().split("T")[0]
+  const [notesSending, setNotesSending] = useState(false)
+  const [notesSent, setNotesSent] = useState(false)
+
+  const sendToNotes = useCallback(async (plan: WeeklyMealPlan) => {
+    setNotesSending(true)
+    const lines = [
+      `JC Shopping List — Week of ${plan.week_start}`,
+      `Theme: ${plan.theme}`,
+      "",
+      "SHOPPING LIST (family of 4)",
+      ...plan.shopping_list.map(i => `• ${i}`),
+      "",
+      "MEAL PREP TIPS",
+      ...plan.meal_prep_tips.map((t, i) => `${i + 1}. ${t}`),
+    ]
+    try {
+      const res = await fetch("/api/send-to-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `JC Shopping List – Week of ${plan.week_start}`,
+          body: lines.join("\n"),
+        }),
+      })
+      if (res.ok) setNotesSent(true)
+    } finally {
+      setNotesSending(false)
+    }
+  }, [])
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery<WeeklyMealPlan>({
     queryKey: ["weekly-meals"],
     queryFn: () => fetchWeeklyMeals(),
@@ -211,8 +241,18 @@ export default function FuelPage() {
 
           {/* Shopping list */}
           {(data?.shopping_list?.length ?? 0) > 0 && data && (
-            <div className="bg-card rounded-2xl p-4 space-y-2">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Shopping List</p>
+            <div className="bg-card rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Shopping List</p>
+                <button
+                  onClick={() => sendToNotes(data)}
+                  disabled={notesSending || notesSent}
+                  className="text-[10px] px-2 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40"
+                >
+                  {notesSent ? "✓ Sent to Notes" : notesSending ? "Sending…" : "Send to Notes"}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Quantities scaled for family of 4</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 {data.shopping_list.map((item, i) => (
                   <div key={i} className="flex items-center gap-2">
