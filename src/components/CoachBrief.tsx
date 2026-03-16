@@ -93,11 +93,12 @@ export function CoachBrief() {
         </button>
       </div>
 
-      {/* Today's workout plan */}
+      {/* Today's workout + recovery — one card */}
       <div className="bg-card rounded-2xl p-4 space-y-3">
+        {/* Workout */}
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Today</p>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Today's Workout</p>
             <p className="text-base font-bold mt-0.5">{brief.today_plan.type}</p>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -114,6 +115,55 @@ export function CoachBrief() {
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Key focus</p>
           <p className="text-sm font-medium">{brief.today_plan.key_focus}</p>
         </div>
+
+        {/* Recovery — same card, divider */}
+        {brief.recovery && (
+          <>
+            <div className="border-t border-border" />
+            <div className="space-y-2.5">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Post-Workout Recovery</p>
+
+              {/* Protein shake — always first if applicable */}
+              {brief.recovery.protein_shake === "yes" && brief.recovery.shake_recipe && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-lg leading-none mt-0.5">🥤</span>
+                  <div>
+                    <p className="text-sm font-semibold">Protein Shake</p>
+                    <p className="text-xs text-muted-foreground">{brief.recovery.shake_recipe}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-2.5">
+                <span className="text-lg leading-none mt-0.5">
+                  {brief.recovery.primary.toLowerCase().includes("cold") ? "🧊" :
+                   brief.recovery.primary.toLowerCase().includes("sauna") ? "🔥" :
+                   brief.recovery.primary.toLowerCase().includes("red") ? "💡" :
+                   brief.recovery.primary.toLowerCase().includes("yoga") ? "🧘" : "◈"}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">{brief.recovery.primary}</p>
+                  <p className="text-xs text-muted-foreground">{brief.recovery.protocol}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <span className="text-lg leading-none mt-0.5">🧘</span>
+                <div>
+                  <p className="text-sm font-semibold">{brief.recovery.stretch_yoga}</p>
+                  <p className="text-xs text-muted-foreground">Focus: {brief.recovery.stretch_focus}</p>
+                </div>
+              </div>
+
+              {brief.recovery.optional && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-lg leading-none mt-0.5">✦</span>
+                  <p className="text-sm text-muted-foreground">{brief.recovery.optional}</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tomorrow preview */}
@@ -187,6 +237,26 @@ export function CoachBrief() {
           </div>
         )}
       </div>
+
+      {/* Daily challenge */}
+      {brief.daily_challenge && (
+        <div className="bg-card rounded-2xl p-4 space-y-2 border border-primary/20">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Daily Challenge</p>
+            <span className="text-xs text-muted-foreground">{brief.daily_challenge.timing}</span>
+          </div>
+          <p className="font-bold text-primary">{brief.daily_challenge.name}</p>
+          <p className="text-sm text-foreground/80">{brief.daily_challenge.description}</p>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-mono font-medium">
+              {brief.daily_challenge.sets_reps}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground border-t border-border pt-2">{brief.daily_challenge.why}</p>
+        </div>
+      )}
+
+
 
       {brief.generated_at && (
         <p className="text-[10px] text-muted-foreground text-center">

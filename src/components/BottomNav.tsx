@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation"
 
 const NAV = [
   { href: "/", label: "Today", icon: "◎" },
-  { href: "/performance", label: "Perf", icon: "↑" },
+  { href: "/performance", label: "Performance", icon: "↑" },
   { href: "/recovery", label: "Recovery", icon: "♡" },
-  { href: "/body", label: "Body", icon: "◇" },
+  { href: "/fuel", label: "Fuel", icon: "⊕" },
   { href: "/workouts", label: "Log", icon: "≡" },
 ]
 
@@ -31,7 +31,7 @@ export function BottomNav() {
               }`}
             >
               <span className="text-xl leading-none">{icon}</span>
-              <span className="text-[10px] font-medium tracking-wide">{label}</span>
+              <span className="text-[9px] font-medium tracking-wide">{label}</span>
             </Link>
           )
         })}

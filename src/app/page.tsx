@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchDashboard } from "@/lib/api"
 import type { DashboardData } from "@/lib/api"
 import { CoachBrief } from "@/components/CoachBrief"
+import { Tooltip, DEFS } from "@/components/Tooltip"
 
 function fmt(v: number | null | undefined, digits = 0): string {
   if (v == null) return "—"
@@ -151,20 +152,36 @@ export default function TodayPage() {
       {/* Divider */}
       <div className="border-t border-border/50" />
 
-      {/* PMC snapshot — CTL / ATL / TSB / ACWR */}
+      {/* Training load snapshot */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="CTL (Fitness)" value={fmt(load?.ctl, 1)} sub={`+${fmt((load?.ctl ?? 0) - 42, 1)} vs baseline`} valueClass="text-[var(--chart-1)]" />
-        <StatCard label="ATL (Fatigue)" value={fmt(load?.atl, 1)} sub={`TSS today: ${fmt(load?.tss)}`} valueClass="text-[var(--chart-2)]" />
-        <StatCard label="TSB (Form)" value={fmt(load?.tsb, 1)} sub={load?.tsb != null ? (load.tsb > 5 ? "Ready" : load.tsb < -20 ? "Overreached" : "Neutral") : undefined} valueClass={tsbColor(load?.tsb ?? null)} />
-        <StatCard label="ACWR" value={fmt(load?.acwr, 2)} sub={load?.acwr != null ? (load.acwr > 1.3 ? "⚠ Overreach risk" : load.acwr > 1.1 ? "Caution" : "Safe") : undefined} valueClass={acwrColor(load?.acwr ?? null)} />
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <Tooltip definition={DEFS.CTL}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Chronic Training Load (CTL)</p></Tooltip>
+          <p className={`text-2xl font-bold font-mono text-[var(--chart-1)]`}>{fmt(load?.ctl, 1)}</p>
+          <p className="text-xs text-muted-foreground">target: 75+ by July</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <Tooltip definition={DEFS.ATL}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Acute Training Load (ATL)</p></Tooltip>
+          <p className={`text-2xl font-bold font-mono text-[var(--chart-2)]`}>{fmt(load?.atl, 1)}</p>
+          <p className="text-xs text-muted-foreground"><Tooltip definition={DEFS.TSS}>Training Stress Score (TSS)</Tooltip> today: {fmt(load?.tss)}</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <Tooltip definition={DEFS.TSB}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Training Stress Balance (TSB)</p></Tooltip>
+          <p className={`text-2xl font-bold font-mono ${tsbColor(load?.tsb ?? null)}`}>{fmt(load?.tsb, 1)}</p>
+          <p className="text-xs text-muted-foreground">{load?.tsb != null ? (load.tsb > 5 ? "Fresh & ready" : load.tsb < -20 ? "Overreached" : "Building") : "—"}</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <Tooltip definition={DEFS.ACWR}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Workload Ratio (ACWR)</p></Tooltip>
+          <p className={`text-2xl font-bold font-mono ${acwrColor(load?.acwr ?? null)}`}>{fmt(load?.acwr, 2)}</p>
+          <p className="text-xs text-muted-foreground">{load?.acwr != null ? (load.acwr > 1.3 ? "⚠ Injury risk zone" : load.acwr > 1.1 ? "Caution" : "Safe zone") : "—"}</p>
+        </div>
       </div>
 
       {/* HRV + Readiness */}
       <div className="bg-card rounded-2xl p-4 space-y-3">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Recovery</p>
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Recovery Metrics</p>
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">HRV</p>
+            <Tooltip definition={DEFS.HRV}><p className="text-xs text-muted-foreground">Heart Rate Variability (HRV)</p></Tooltip>
             <p className={`text-xl font-bold font-mono ${hrvColor(load?.hrv_last_night ?? null, load?.hrv_weekly_avg ?? null)}`}>
               {fmt(load?.hrv_last_night)}
             </p>
@@ -198,17 +215,20 @@ export default function TodayPage() {
 
       {/* VO2 max + body */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          label="VO2 Max"
-          value={fmt(load?.vo2_max, 1)}
-          sub="Target: 55+ by July"
-          valueClass="text-[var(--chart-5)]"
-        />
-        <StatCard
-          label="Weight"
-          value={body?.weight_kg ? `${fmt(body.weight_kg, 1)} kg` : "—"}
-          sub={body?.fat_ratio ? `${fmt(body.fat_ratio, 1)}% fat` : undefined}
-        />
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <Tooltip definition={DEFS.VO2}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">VO2 Max</p></Tooltip>
+          <p className="text-2xl font-bold font-mono text-[var(--chart-5)]">{fmt(load?.vo2_max, 1)}</p>
+          <p className="text-xs text-muted-foreground">target: 55+ by July</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Weight</p>
+          <p className="text-2xl font-bold font-mono">
+            {body?.weight_kg ? `${(body.weight_kg * 2.20462).toFixed(0)} lb` : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {body?.fat_ratio ? `${fmt(body.fat_ratio, 1)}% fat · goal: ≤15%` : "goal: ≤15% fat"}
+          </p>
+        </div>
       </div>
 
       {/* Last workout */}
