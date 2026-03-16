@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { fetchDashboard } from "@/lib/api"
 import type { DashboardData } from "@/lib/api"
+import { CoachBrief } from "@/components/CoachBrief"
 
 function fmt(v: number | null | undefined, digits = 0): string {
   if (v == null) return "—"
@@ -143,6 +144,12 @@ export default function TodayPage() {
           ↺
         </button>
       </div>
+
+      {/* Coach Brief — daily plan, analysis, nutrition */}
+      <CoachBrief />
+
+      {/* Divider */}
+      <div className="border-t border-border/50" />
 
       {/* PMC snapshot — CTL / ATL / TSB / ACWR */}
       <div className="grid grid-cols-2 gap-3">
