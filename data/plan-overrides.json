@@ -1,0 +1,32 @@
+{
+  "2026-03-17": {
+    "type": "Zone 2 Easy Run",
+    "emoji": "🏃",
+    "planned_miles": 4,
+    "note": "40 min easy, HR 121–146 bpm. Pace natural ~11:30–12:30/mi. Recover before travel."
+  },
+  "2026-03-18": {
+    "type": "Zone 3 Tempo Ladder",
+    "emoji": "⚡",
+    "planned_miles": 5.5,
+    "note": "50 min: 10min Z2 warmup + 3x5min Z3 tempo (147–158 bpm) w/ 2min Z2 recovery + 10min Z2 cooldown. Last hard session before Reno."
+  },
+  "2026-03-19": {
+    "type": "Rest",
+    "emoji": "😴",
+    "planned_miles": 0,
+    "note": "Travel day to Reno. Rest or light walk only."
+  },
+  "2026-03-20": {
+    "type": "Hotel Gym / Light Activity",
+    "emoji": "🏨",
+    "planned_miles": 0,
+    "note": "30–45 min bodyweight, treadmill if feeling it. Keep it light—focus on recovery and not pushing hard."
+  },
+  "2026-03-21": {
+    "type": "Hotel Gym / Light Activity",
+    "emoji": "🏨",
+    "planned_miles": 0,
+    "note": "30–45 min if you move. Walk, easy treadmill. No hard running. Let Reno be Reno."
+  }
+}
