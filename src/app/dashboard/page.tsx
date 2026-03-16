@@ -181,8 +181,7 @@ function DashboardInner() {
   const totalWeekSales = store.departments.reduce((s, d) => s + d.sales, 0)
 
   // Alert card metrics
-  const totalShrink = store.shrink?.reduce((s, r) => s + r.shrink_dollars, 0) ?? 0
-  const topShrinkDept = store.shrink?.reduce((a, b) => a.shrink_pct > b.shrink_pct ? a : b, store.shrink[0])
+
 
   return (
     <div className="p-6 max-w-5xl space-y-6">
@@ -223,9 +222,9 @@ function DashboardInner() {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 items-start">
+      <div className="grid grid-cols-3 gap-4">
         {/* Left column: action cards + trend chart */}
-        <div className="col-span-2 space-y-3">
+        <div className="col-span-2 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             {/* Suspicious transactions */}
             {(() => {
@@ -273,27 +272,29 @@ function DashboardInner() {
             })()}
           </div>
 
-          {/* Trend chart */}
-          <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+          {/* Trend chart — flex-1 fills remaining height */}
+          <div className="bg-card border border-border rounded-lg p-4 shadow-sm flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium">6-Week Sales Trend</p>
               <span className="text-xs text-muted-foreground">Weekly</span>
             </div>
-            <ResponsiveContainer width="100%" height={80}>
-              <BarChart data={store.weekly_trend} barSize={28}>
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                <YAxis hide domain={['auto', 'auto']} />
-                <RTooltip
-                  cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: 12, color: "var(--foreground)" }}
-                  labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
-                  itemStyle={{ color: "var(--primary)", fontWeight: 600 }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(v: any) => [fmt$(Number(v ?? 0)), ""]}
-                />
-                <Bar dataKey="sales" fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.85} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="flex-1 min-h-[80px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={store.weekly_trend} barSize={28}>
+                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <RTooltip
+                    cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: 12, color: "var(--foreground)" }}
+                    labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
+                    itemStyle={{ color: "var(--primary)", fontWeight: 600 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(v: any) => [fmt$(Number(v ?? 0)), ""]}
+                  />
+                  <Bar dataKey="sales" fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.85} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
@@ -344,18 +345,6 @@ function DashboardInner() {
         </div>
       </div>
 
-      {/* Shrink Exposure */}
-      <Link href={`/shrink?store=${storeId}`} className="block bg-card border border-border rounded-lg p-4 shadow-sm hover:border-primary/40 transition-colors">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Shrink Exposure</p>
-          <p className="text-xs text-primary">View full report →</p>
-        </div>
-        <p className="text-3xl font-semibold tabular-nums mt-1">${totalShrink.toLocaleString()}</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          This week · worst: <span className="font-medium text-foreground">{topShrinkDept?.dept}</span> at {topShrinkDept?.shrink_pct.toFixed(1)}%
-          {" "}· Unknown: <span className="text-amber-500 font-medium">${store.shrink?.reduce((s, r) => s + r.unknown, 0).toLocaleString()}</span>
-        </p>
-      </Link>
 
       {/* Suspicious transactions modal */}
       {suspiciousOpen && (
