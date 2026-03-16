@@ -72,7 +72,15 @@ export interface TrendPoint {
   deep_sleep_seconds: number | null
   body_battery_wake: number | null
   body_battery_eod: number | null
+  body_battery_high: number | null
+  hrv_weekly_avg: number | null
+  hrv_baseline_low: number | null
+  hrv_baseline_high: number | null
   training_readiness_score: number | null
+  training_readiness_level: string | null
+  steps: number | null
+  active_kcal: number | null
+  stress_avg: number | null
 }
 
 export interface Workout {

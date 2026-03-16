@@ -25,13 +25,18 @@ export interface ChatMessage {
   content: string
 }
 
+export interface ChatRequest {
+  messages: ChatMessage[]
+  imageDataUrl?: string  // data:image/jpeg;base64,... — attached to last user message
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session.authenticated) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { messages }: { messages: ChatMessage[] } = await req.json()
+  const { messages, imageDataUrl }: ChatRequest = await req.json()
   if (!messages?.length) {
     return NextResponse.json({ error: "No messages" }, { status: 400 })
   }
@@ -92,14 +97,41 @@ ${trends.slice(-7).map((t: any) => `- ${t.date}: CTL ${t.ctl?.toFixed(1) ?? "—
 
 ${(() => { const lc = readLifeContext(); return lc.notes.length > 0 ? `## ATHLETE LIFE CONTEXT (override training recommendations accordingly)\n${lc.notes.map((n: string) => `- ${n}`).join("\n")}\n\n` : "" })()}Answer the athlete's question directly. If the athlete tells you about upcoming travel, events, illness, or life changes — acknowledge it and adjust your advice. If they say "remember this" or "save this", confirm you'll factor it in for this session (note: persistent saving requires the Notes to Coach feature on the Today tab). If they mention eating something, performance they noticed, or ask about a metric — give a specific, data-informed response. Keep replies under 200 words unless they ask for a detailed breakdown.
 
-CRITICAL: Always spell out metric names fully on first use, with abbreviation in parentheses: "Chronic Training Load (CTL)", "Acute Training Load (ATL)", "Training Stress Balance (TSB)", "Acute:Chronic Workload Ratio (ACWR)", "Heart Rate Variability (HRV)", "VO2 max". After first use, abbreviations are fine.`
+CRITICAL: Always spell out metric names fully on first use, with abbreviation in parentheses: "Chronic Training Load (CTL)", "Acute Training Load (ATL)", "Training Stress Balance (TSB)", "Acute:Chronic Workload Ratio (ACWR)", "Heart Rate Variability (HRV)", "VO2 max". After first use, abbreviations are fine.
+
+## PHOTO / BARCODE ANALYSIS
+If the athlete sends a photo:
+- FOOD PLATE: Estimate the food items, portion sizes, and approximate macros (calories, protein, carbs, fat). Compare to their targets for today. Note if it fits their plan or what to adjust. Acknowledge estimation uncertainty.
+- PRODUCT BARCODE or LABEL: Read the product name and nutrition facts. Evaluate: Does it fit their goals? Is protein adequate? Any ingredients to watch? Does it stack with their supplement protocol?
+- SUPPLEMENT BOTTLE: Identify it, check if it's in their stack, note dosage vs. recommendation.
+- GYM/WORKOUT SCENE: Comment on form, equipment, or training setup if relevant.
+Be specific with numbers. Lead with the most useful insight for their 100-mile training goals.`
+
+  // Build Anthropic message array — last user message gets vision block if image present
+  const anthropicMessages = messages.map((m: ChatMessage, i: number) => {
+    const isLastUser = i === messages.length - 1 && m.role === "user" && imageDataUrl
+    if (isLastUser) {
+      const match = imageDataUrl!.match(/^data:([^;]+);base64,(.+)$/)
+      if (match) {
+        const [, mediaType, base64] = match
+        return {
+          role: "user" as const,
+          content: [
+            { type: "image" as const, source: { type: "base64" as const, media_type: mediaType as any, data: base64 } },
+            { type: "text" as const, text: m.content || "What is this?" },
+          ],
+        }
+      }
+    }
+    return { role: m.role as "user" | "assistant", content: m.content }
+  })
 
   try {
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 600,
       system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: anthropicMessages,
     })
 
     const reply = (response.content[0] as any).text

@@ -50,14 +50,15 @@ export default function RecoveryPage() {
   // Cast trend data — the API may include extra fields
   const data = raw as any[]
 
-  const latest = data[data.length - 1]
+  // Use most recently enriched row for snapshot cards (today's row often has nulls)
+  const latest = [...data].reverse().find(d => d.hrv_last_night != null || d.sleep_seconds != null) ?? data[data.length - 1]
 
   return (
     <div className="p-4 space-y-5">
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-lg font-bold">Recovery</h1>
         <div className="flex gap-1">
-          {[14, 30, 60].map(d => (
+          {[7, 14, 30, 60].map(d => (
             <button
               key={d}
               onClick={() => setDays(d)}
@@ -92,6 +93,16 @@ export default function RecoveryPage() {
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Body Battery</p>
           <p className="text-3xl font-bold font-mono text-accent">{fmt(latest?.body_battery_wake)}</p>
           <p className="text-xs text-muted-foreground">eod: {fmt(latest?.body_battery_eod)}</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Steps</p>
+          <p className="text-3xl font-bold font-mono">{latest?.steps ? latest.steps.toLocaleString() : "—"}</p>
+          <p className="text-xs text-muted-foreground">active: {fmt(latest?.active_kcal, 0)} kcal</p>
+        </div>
+        <div className="bg-card rounded-2xl p-4 space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Stress</p>
+          <p className="text-3xl font-bold font-mono">{fmt(latest?.stress_avg, 0)}</p>
+          <p className="text-xs text-muted-foreground">readiness: {latest?.training_readiness_score ?? "—"}</p>
         </div>
       </div>
 

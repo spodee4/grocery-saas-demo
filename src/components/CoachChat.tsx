@@ -3,6 +3,10 @@
 import { useState, useRef, useEffect } from "react"
 import type { ChatMessage } from "@/app/api/coach-chat/route"
 
+interface LocalMessage extends ChatMessage {
+  imagePreview?: string  // data URL shown in bubble
+}
+
 const SUGGESTIONS = [
   "What should I focus on this week?",
   "How's my fitness trending?",
@@ -14,11 +18,13 @@ const SUGGESTIONS = [
 
 export function CoachChat() {
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<LocalMessage[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
+  const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -30,20 +36,45 @@ export function CoachChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, loading])
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string
+      setPendingImage({ dataUrl })
+    }
+    reader.readAsDataURL(file)
+    // Reset so same file can be re-selected
+    e.target.value = ""
+  }
+
   async function send(text?: string) {
     const content = (text ?? input).trim()
-    if (!content || loading) return
+    if ((!content && !pendingImage) || loading) return
 
-    const newMessages: ChatMessage[] = [...messages, { role: "user", content }]
+    const displayContent = content || "What's this?"
+    const imageDataUrl = pendingImage?.dataUrl
+
+    const newMessages: LocalMessage[] = [
+      ...messages,
+      { role: "user", content: displayContent, imagePreview: imageDataUrl },
+    ]
     setMessages(newMessages)
     setInput("")
+    setPendingImage(null)
     setLoading(true)
+
+    // Send to API — strip local imagePreview, pass imageDataUrl separately
+    const apiMessages: ChatMessage[] = newMessages.map(m => ({ role: m.role, content: m.content }))
+    const body: Record<string, unknown> = { messages: apiMessages }
+    if (imageDataUrl) body.imageDataUrl = imageDataUrl
 
     try {
       const res = await fetch("/api/coach-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (data.reply) {
@@ -60,6 +91,16 @@ export function CoachChat() {
 
   return (
     <>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Backdrop */}
       {open && (
         <div
@@ -93,7 +134,8 @@ export function CoachChat() {
             {messages.length === 0 && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground text-center pt-2">
-                  Ask me anything about your training, nutrition, or performance.
+                  Ask me anything about your training, nutrition, or performance.<br />
+                  <span className="text-[10px]">Tap 📷 to send a food photo or product barcode.</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5 justify-center">
                   {SUGGESTIONS.map(s => (
@@ -116,6 +158,14 @@ export function CoachChat() {
                     ? "bg-primary text-primary-foreground rounded-br-sm"
                     : "bg-card text-foreground rounded-bl-sm"
                 }`}>
+                  {msg.imagePreview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={msg.imagePreview}
+                      alt="Attached photo"
+                      className="rounded-lg mb-1.5 max-h-40 object-cover w-full"
+                    />
+                  )}
                   {msg.content}
                 </div>
               </div>
@@ -136,9 +186,37 @@ export function CoachChat() {
             <div ref={bottomRef} />
           </div>
 
+          {/* Image preview bar */}
+          {pendingImage && (
+            <div className="px-3 pt-2 shrink-0">
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingImage.dataUrl}
+                  alt="Pending"
+                  className="h-16 w-16 rounded-xl object-cover border border-border"
+                />
+                <button
+                  onClick={() => setPendingImage(null)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-background border border-border rounded-full text-[10px] flex items-center justify-center hover:bg-muted"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Input */}
           <div className="px-3 py-2 border-t border-border shrink-0">
             <div className="flex gap-2 items-center bg-card rounded-2xl px-3 py-2">
+              {/* Camera button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-muted-foreground hover:text-primary transition-colors shrink-0 text-base leading-none"
+                aria-label="Attach photo"
+              >
+                📷
+              </button>
               <input
                 ref={inputRef}
                 value={input}
@@ -149,7 +227,7 @@ export function CoachChat() {
               />
               <button
                 onClick={() => send()}
-                disabled={!input.trim() || loading}
+                disabled={(!input.trim() && !pendingImage) || loading}
                 className="text-primary disabled:opacity-30 transition-opacity font-bold text-base leading-none"
               >
                 ↑

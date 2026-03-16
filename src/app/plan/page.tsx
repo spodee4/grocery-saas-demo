@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchDashboard, fetchWorkouts } from "@/lib/api"
 import type { DashboardData, Workout } from "@/lib/api"
@@ -97,6 +98,33 @@ export default function PlanPage() {
 
   const weightLb = body?.body?.weight_kg ? (body.body.weight_kg * 2.20462) : null
   const fatPct = body?.body?.fat_ratio ?? null
+  const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
+
+  // Projection helpers
+  const weeksElapsed = Math.max(1, Math.ceil((Date.now() - new Date(`${new Date().getFullYear()}-01-01`).getTime()) / (7 * 24 * 60 * 60 * 1000)))
+  const miPerWeek = ytdMiles / weeksElapsed
+  const weeksRemaining = 52 - weeksElapsed
+  const projectedYtdMiles = ytdMiles + miPerWeek * weeksRemaining
+  const milesNeededPerWeek = Math.max(0, (ytdGoalMiles - ytdMiles) / Math.max(weeksRemaining, 1))
+
+  function projectDate(weeksNeeded: number): string {
+    const d = new Date()
+    d.setDate(d.getDate() + Math.round(weeksNeeded * 7))
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  }
+
+  const weightToLose = weightLb ? Math.max(0, weightLb - 170) : 9
+  // conservative: ~0.5 lb/week without explicit plan; with food plan: 1.5 lb/week
+  const weightPaceWeeks = weightToLose / 0.5
+  const weightFoodPlanWeeks = weightToLose / 1.5
+  const weightAtRaceDay = weightLb ? Math.max(170, weightLb - 0.5 * weeksToRace).toFixed(0) : "—"
+  const weightFoodPlanAtRace = weightLb ? Math.max(170, weightLb - 1.5 * weeksToRace).toFixed(0) : "—"
+
+  const fatToLose = fatPct ? Math.max(0, fatPct - 15) : 3.2
+  const fatPaceWeeks = fatToLose / 0.15   // ~0.15%/week without plan
+  const fatFoodPlanWeeks = fatToLose / 0.35  // ~0.35%/week with deficit + training
+  const fatAtRaceDay = fatPct ? Math.max(15, fatPct - 0.15 * weeksToRace).toFixed(1) : "—"
+  const fatFoodPlanAtRace = fatPct ? Math.max(15, fatPct - 0.35 * weeksToRace).toFixed(1) : "—"
 
   return (
     <div className="p-4 space-y-5">
@@ -131,54 +159,88 @@ export default function PlanPage() {
       <div className="bg-card rounded-2xl p-4 space-y-4">
         <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Goals</p>
 
-        {/* Body recomp */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline">
-            <p className="text-xs font-medium">Weight → 170 lb</p>
-            <p className="text-xs font-mono text-muted-foreground">
-              {weightLb ? `${weightLb.toFixed(0)} lb now` : "—"}
-            </p>
-          </div>
-          {weightLb && (
-            <ProgressBar
-              value={weightLb <= 170 ? 100 : Math.max(0, ((220 - weightLb) / (220 - 170)) * 100)}
-              max={100}
-              color={weightLb <= 170 ? "bg-secondary" : "bg-primary"}
-            />
-          )}
-          <p className="text-[10px] text-muted-foreground">
-            {weightLb ? `${Math.max(0, weightLb - 170).toFixed(0)} lb to goal` : "Sync scale to track"}
-          </p>
-        </div>
+        {/* Weight goal */}
+        {[
+          {
+            key: "weight",
+            label: "Weight → 170 lb",
+            current: weightLb ? `${weightLb.toFixed(0)} lb now` : "—",
+            progress: weightLb ? Math.max(0, ((220 - weightLb) / (220 - 170)) * 100) : 0,
+            color: (weightLb ?? 999) <= 170 ? "bg-secondary" : "bg-primary",
+            sub: weightLb ? `${Math.max(0, weightLb - 170).toFixed(0)} lb to goal` : "Sync scale to track",
+            insights: [
+              { label: "At current pace", value: `~${projectDate(weightPaceWeeks)}`, note: `${weightAtRaceDay} lb at race day` },
+              { label: "With food plan (−500 kcal/day)", value: `~${projectDate(weightFoodPlanWeeks)}`, note: `${weightFoodPlanAtRace} lb at race day ✓` },
+              { label: "Race day target", value: "170 lb", note: `${weightToLose.toFixed(0)} lb to lose in ${weeksToRace}w` },
+            ],
+            tip: "Implementing a 300–500 kcal/day deficit while fueling workouts properly is the fastest safe path. Check your Fuel tab for the week's meal plan.",
+          },
+          {
+            key: "fat",
+            label: "Body fat → ≤15%",
+            current: fatPct ? `${fatPct.toFixed(1)}% now` : "—",
+            progress: fatPct ? Math.max(0, ((30 - fatPct) / (30 - 15)) * 100) : 0,
+            color: (fatPct ?? 99) <= 15 ? "bg-secondary" : "bg-primary",
+            sub: fatPct ? `${Math.max(0, fatPct - 15).toFixed(1)}% to goal` : "Sync scale to track",
+            insights: [
+              { label: "At current pace", value: `~${projectDate(fatPaceWeeks)}`, note: `${fatAtRaceDay}% at race day` },
+              { label: "With training + food plan", value: `~${projectDate(fatFoodPlanWeeks)}`, note: `${fatFoodPlanAtRace}% at race day ✓` },
+              { label: "Race day target", value: "≤15%", note: "Reduces dead weight for 100 miles" },
+            ],
+            tip: "Body fat drops from caloric deficit + increased easy mileage. Strength work preserves muscle. Zone 2 runs burn fat more efficiently over time.",
+          },
+          {
+            key: "mileage",
+            label: `Annual Mileage → ${ytdGoalMiles} mi`,
+            current: `${ytdMiles.toFixed(0)} mi YTD`,
+            progress: (ytdMiles / ytdGoalMiles) * 100,
+            color: "bg-accent",
+            sub: `${milesNeededPerWeek.toFixed(1)} mi/week needed to hit goal`,
+            insights: [
+              { label: "Current weekly avg", value: `${miPerWeek.toFixed(1)} mi/wk`, note: `${weeksElapsed}w elapsed` },
+              { label: "Projected at current pace", value: `${projectedYtdMiles.toFixed(0)} mi`, note: projectedYtdMiles >= ytdGoalMiles ? "On track ✓" : `${(ytdGoalMiles - projectedYtdMiles).toFixed(0)} mi short` },
+              { label: "Needed to hit 800 mi", value: `${milesNeededPerWeek.toFixed(1)} mi/wk`, note: `${weeksRemaining}w remaining in year` },
+            ],
+            tip: "Your training plan has 28 mi/week in the peak phase. Hitting that consistently will put you on track. Long runs on Saturdays drive most of the annual mileage.",
+          },
+        ].map(goal => (
+          <div key={goal.key} className="space-y-1.5">
+            <button
+              className="w-full text-left"
+              onClick={() => setExpandedGoal(expandedGoal === goal.key ? null : goal.key)}
+            >
+              <div className="flex justify-between items-baseline">
+                <p className="text-xs font-medium flex items-center gap-1">
+                  {goal.label}
+                  <span className="text-muted-foreground text-[10px]">{expandedGoal === goal.key ? "↑" : "↓"}</span>
+                </p>
+                <p className="text-xs font-mono text-muted-foreground">{goal.current}</p>
+              </div>
+            </button>
+            <ProgressBar value={goal.progress} max={100} color={goal.color} />
+            <p className="text-[10px] text-muted-foreground">{goal.sub}</p>
 
-        {/* Body fat */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline">
-            <p className="text-xs font-medium">Body fat → ≤15%</p>
-            <p className="text-xs font-mono text-muted-foreground">
-              {fatPct ? `${fatPct.toFixed(1)}% now` : "—"}
-            </p>
+            {expandedGoal === goal.key && (
+              <div className="mt-2 rounded-xl bg-muted/40 p-3 space-y-3">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Projections</p>
+                <div className="space-y-2">
+                  {goal.insights.map((ins, i) => (
+                    <div key={i} className="flex justify-between items-start gap-2">
+                      <p className="text-[11px] text-muted-foreground flex-1">{ins.label}</p>
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold text-foreground">{ins.value}</p>
+                        <p className="text-[10px] text-muted-foreground">{ins.note}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-border/50 pt-2">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{goal.tip}</p>
+                </div>
+              </div>
+            )}
           </div>
-          {fatPct && (
-            <ProgressBar
-              value={fatPct <= 15 ? 100 : Math.max(0, ((30 - fatPct) / (30 - 15)) * 100)}
-              max={100}
-              color={fatPct <= 15 ? "bg-secondary" : "bg-primary"}
-            />
-          )}
-        </div>
-
-        {/* Annual mileage */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline">
-            <p className="text-xs font-medium">Annual Mileage → {ytdGoalMiles} mi</p>
-            <p className="text-xs font-mono text-muted-foreground">{ytdMiles.toFixed(0)} mi YTD</p>
-          </div>
-          <ProgressBar value={ytdMiles} max={ytdGoalMiles} color="bg-accent" />
-          <p className="text-[10px] text-muted-foreground">
-            {((ytdGoalMiles - ytdMiles) / Math.max(weeksToRace, 1)).toFixed(1)} mi/week needed to hit goal
-          </p>
-        </div>
+        ))}
       </div>
 
       {/* Daily Habits */}
