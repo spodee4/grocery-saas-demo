@@ -1,0 +1,17 @@
+{
+  "name": "JC Coach",
+  "short_name": "Coach",
+  "description": "Personal training coach dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
