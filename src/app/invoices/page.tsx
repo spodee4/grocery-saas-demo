@@ -165,6 +165,31 @@ function exportInvoiceCSV(inv: Invoice) {
   a.click()
 }
 
+function exportBulkCSV(invoices: (Invoice & { _store: string })[]) {
+  const headers = ["Store", "Invoice #", "Vendor", "Dept", "Date", "Amount", "Status", "Allowance Earned", "Allowance Applied", "Gap"]
+  const rows = [
+    headers,
+    ...invoices.map(i => [
+      i._store,
+      i.id,
+      i.vendor,
+      i.dept,
+      i.date,
+      i.amount.toFixed(2),
+      i.status,
+      i.allowance_earned.toFixed(2),
+      i.allowance_applied.toFixed(2),
+      (i.allowance_earned - i.allowance_applied).toFixed(2),
+    ]),
+  ]
+  const csv = rows.map(r => r.map(esc).join(",")).join("\n")
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
+  const now = new Date().toISOString().slice(0, 10)
+  a.download = `invoices-${now}.csv`
+  a.click()
+}
+
 function exportInvoicePDF(inv: Invoice) {
   const gap = inv.allowance_earned - inv.allowance_applied
   const totalExt = inv.line_items.reduce((s, li) => s + li.extended, 0)
@@ -493,7 +518,20 @@ function InvoiceLibrary({ storeId }: { storeId: string }) {
             Clear filters
           </button>
         )}
-        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} invoice{filtered.length !== 1 ? "s" : ""} · ${total.toLocaleString()} total</span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">{filtered.length} invoice{filtered.length !== 1 ? "s" : ""} · ${total.toLocaleString()} total</span>
+          {filtered.length > 0 && (
+            <button
+              onClick={() => exportBulkCSV(filtered)}
+              className="flex items-center gap-1.5 text-xs bg-card border border-border hover:border-primary/60 hover:text-primary text-muted-foreground px-2.5 py-1.5 rounded-md transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Export All CSV
+            </button>
+          )}
+        </div>
       </div>
 
       {gaps > 0 && (

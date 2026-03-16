@@ -539,7 +539,7 @@ function AgingReport({ storeId }: { storeId: string }) {
       ))}
 
       <div className="text-sm grid grid-cols-[130px_110px_80px_60px_70px_80px_80px_auto] gap-x-2 py-2 font-bold border-t-2 border-foreground/30">
-        <span colSpan={1}>Total A/P</span>
+        <span>Total A/P</span>
         <span /><span /><span />
         <span className="text-right tabular-nums">{fmtFull(rows.reduce((s, r) => s + r.amount, 0))}</span>
         <span className="text-right tabular-nums text-muted-foreground">{fmtFull(rows.reduce((s, r) => s + r.paid, 0))}</span>

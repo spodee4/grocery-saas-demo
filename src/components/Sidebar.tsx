@@ -25,6 +25,16 @@ const NAV = [
     ),
   },
   {
+    href: "/shrink",
+    label: "Shrink",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path d="M3 17l5-5 4 4 9-10" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 6h5v5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/database",
     label: "Database",
     icon: (
@@ -39,6 +49,16 @@ const NAV = [
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path d="M3 20h18M8 16V10M12 16V4M16 16v-6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/finance/tender",
+    label: "Cash/Tender",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="2" y="6" width="20" height="12" rx="2" /><path d="M2 10h20" strokeLinecap="round" />
+        <circle cx="12" cy="15" r="1.5" />
       </svg>
     ),
   },
