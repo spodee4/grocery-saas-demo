@@ -78,6 +78,16 @@ export function CoachBrief() {
 
   return (
     <div className="space-y-3">
+      {/* Motivational Quote */}
+      {brief.motivational_quote && (
+        <div className="bg-card rounded-2xl p-4 border-l-2 border-primary/60">
+          <p className="text-sm font-medium italic text-foreground/90 leading-relaxed">
+            "{brief.motivational_quote.text}"
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1.5">— {brief.motivational_quote.author}</p>
+        </div>
+      )}
+
       {/* Status + regenerate */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchWorkouts } from "@/lib/api"
 import type { Workout } from "@/lib/api"
@@ -9,19 +9,36 @@ function fmt(v: number | null | undefined, d = 0) {
   return v == null ? null : v.toFixed(d)
 }
 
-function fmtDist(mi: number | null | undefined) {
-  if (!mi) return null
-  return `${mi.toFixed(1)} mi`
+function fmtPace(durationMin: number | null, distanceMi: number | null): string | null {
+  if (!durationMin || !distanceMi || distanceMi < 0.5) return null
+  const minPerMile = durationMin / distanceMi
+  const mins = Math.floor(minPerMile)
+  const secs = Math.round((minPerMile - mins) * 60)
+  return `${mins}:${secs.toString().padStart(2, "0")}/mi`
+}
+
+function fmtTime(mins: number): string {
+  const h = Math.floor(mins / 60)
+  const m = Math.round(mins % 60)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+// Riegel formula: T2 = T1 * (D2/D1)^1.06
+function riegel(timeMins: number, distMi: number, targetMi: number): string {
+  const t = timeMins * Math.pow(targetMi / distMi, 1.06)
+  return fmtTime(t)
 }
 
 function WorkoutTypeIcon({ type }: { type: string }) {
   const icons: Record<string, string> = {
+    run: "🏃",
     running: "🏃",
     cycling: "🚴",
     strength: "💪",
     stretching: "🧘",
     yoga: "🧘",
     meditation: "🧘",
+    walk: "🚶",
   }
   return <span className="text-lg">{icons[type] || "◎"}</span>
 }
@@ -48,36 +65,131 @@ function ZoneBar({ z1, z2, z3, z4, z5 }: {
   )
 }
 
-const FILTERS = ["all", "running", "cycling", "strength"] as const
-type Filter = (typeof FILTERS)[number]
+// DB stores "run", filter label shows "Running"
+const FILTERS = [
+  { label: "All", value: "all" },
+  { label: "Running", value: "run" },
+  { label: "Cycling", value: "cycling" },
+  { label: "Strength", value: "strength" },
+] as const
+type FilterValue = (typeof FILTERS)[number]["value"]
 
-export default function WorkoutsPage() {
-  const [filter, setFilter] = useState<Filter>("all")
+export default function HistoryPage() {
+  const [filter, setFilter] = useState<FilterValue>("all")
   const [limit, setLimit] = useState(20)
+
+  // Fetch all runs for records (separate query)
+  const { data: allRuns = [] } = useQuery<Workout[]>({
+    queryKey: ["workouts-all-runs"],
+    queryFn: () => fetchWorkouts(500, "run"),
+    staleTime: 10 * 60 * 1000,
+  })
 
   const { data = [], isLoading } = useQuery<Workout[]>({
     queryKey: ["workouts", limit, filter],
     queryFn: () => fetchWorkouts(limit, filter === "all" ? undefined : filter),
   })
 
+  // Personal records computed from all runs
+  const records = useMemo(() => {
+    const validRuns = allRuns.filter(r => r.distance_mi && r.distance_mi > 0.5 && r.duration_min && r.duration_min > 5)
+
+    const longest = validRuns.reduce<Workout | null>((best, r) =>
+      (r.distance_mi ?? 0) > (best?.distance_mi ?? 0) ? r : best, null)
+
+    // Fastest pace (min per mile) from runs ≥1 mile
+    const fastestPaceRun = validRuns
+      .filter(r => r.distance_mi! >= 1)
+      .reduce<Workout | null>((best, r) => {
+        const pace = r.duration_min! / r.distance_mi!
+        const bestPace = best ? best.duration_min! / best.distance_mi! : 999
+        return pace < bestPace ? r : best
+      }, null)
+
+    // Best long run (≥5 miles) for marathon estimate
+    const bestLongRun = validRuns
+      .filter(r => r.distance_mi! >= 5)
+      .reduce<Workout | null>((best, r) => {
+        // Use pace as proxy for "best" effort
+        const pace = r.duration_min! / r.distance_mi!
+        const bestPace = best ? best.duration_min! / best.distance_mi! : 999
+        return pace < bestPace ? r : best
+      }, null)
+
+    const marathonEst = bestLongRun?.distance_mi && bestLongRun?.duration_min
+      ? riegel(bestLongRun.duration_min, bestLongRun.distance_mi, 26.2)
+      : null
+
+    const halfMarathonEst = bestLongRun?.distance_mi && bestLongRun?.duration_min
+      ? riegel(bestLongRun.duration_min, bestLongRun.distance_mi, 13.1)
+      : null
+
+    return { longest, fastestPaceRun, marathonEst, halfMarathonEst }
+  }, [allRuns])
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between pt-2">
-        <h1 className="text-lg font-bold">Workout Log</h1>
+        <h1 className="text-lg font-bold">Workout History</h1>
         <span className="text-xs text-muted-foreground">{data.length} shown</span>
       </div>
+
+      {/* Personal Records */}
+      {allRuns.length > 0 && (
+        <div className="bg-card rounded-2xl p-4 space-y-3">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Personal Records</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-0.5">
+              <p className="text-[10px] text-muted-foreground">Longest Run</p>
+              <p className="text-lg font-bold font-mono text-primary">
+                {records.longest?.distance_mi?.toFixed(1) ?? "—"} mi
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {records.longest ? `${fmtTime(records.longest.duration_min!)} · ${records.longest.date}` : ""}
+              </p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[10px] text-muted-foreground">Fastest Pace</p>
+              <p className="text-lg font-bold font-mono text-secondary">
+                {records.fastestPaceRun
+                  ? fmtPace(records.fastestPaceRun.duration_min, records.fastestPaceRun.distance_mi)
+                  : "—"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {records.fastestPaceRun
+                  ? `${records.fastestPaceRun.distance_mi?.toFixed(1)} mi · ${records.fastestPaceRun.date}`
+                  : ""}
+              </p>
+            </div>
+            {records.halfMarathonEst && (
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-muted-foreground">Est. Half Marathon</p>
+                <p className="text-lg font-bold font-mono text-accent">{records.halfMarathonEst}</p>
+                <p className="text-[10px] text-muted-foreground">Riegel formula projection</p>
+              </div>
+            )}
+            {records.marathonEst && (
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-muted-foreground">Est. Marathon</p>
+                <p className="text-lg font-bold font-mono text-[var(--chart-5)]">{records.marathonEst}</p>
+                <p className="text-[10px] text-muted-foreground">Riegel formula projection</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filter pills */}
       <div className="flex gap-2 flex-wrap">
         {FILTERS.map(f => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
+            key={f.value}
+            onClick={() => setFilter(f.value)}
             className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors ${
-              filter === f ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
+              filter === f.value ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
             }`}
           >
-            {f}
+            {f.label}
           </button>
         ))}
       </div>
@@ -102,7 +214,7 @@ export default function WorkoutsPage() {
                 </div>
                 {w.hrTSS && (
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">TSS</p>
+                    <p className="text-xs text-muted-foreground">Training Stress Score (TSS)</p>
                     <p className="font-bold font-mono text-primary">{fmt(w.hrTSS)}</p>
                   </div>
                 )}
@@ -110,10 +222,12 @@ export default function WorkoutsPage() {
 
               {/* Stats row */}
               <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
-                {w.duration_min && <span>{fmt(w.duration_min)}m</span>}
-                {w.distance_mi && <span>{fmtDist(w.distance_mi)}</span>}
+                {w.duration_min && <span>{fmtTime(w.duration_min)}</span>}
+                {w.distance_mi && <span>{w.distance_mi.toFixed(1)} mi</span>}
+                {w.duration_min && w.distance_mi && w.distance_mi > 0.5 && (
+                  <span>{fmtPace(w.duration_min, w.distance_mi)}</span>
+                )}
                 {w.avg_hr && <span>{fmt(w.avg_hr)} bpm</span>}
-                {w.max_hr && <span>max {fmt(w.max_hr)}</span>}
                 {w.avg_cadence && <span>{fmt(w.avg_cadence)} rpm</span>}
                 {w.avg_power_watts && <span>{fmt(w.avg_power_watts)}W</span>}
                 {w.total_output_kj && <span>{fmt(w.total_output_kj)} kJ</span>}

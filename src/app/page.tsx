@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchDashboard } from "@/lib/api"
 import type { DashboardData } from "@/lib/api"
 import { CoachBrief } from "@/components/CoachBrief"
-import { Tooltip, DEFS } from "@/components/Tooltip"
+import { Tooltip, MetricCard, DEFS, ctlInsight, atlInsight, tsbInsight, acwrInsight, vo2Insight } from "@/components/Tooltip"
 
 function fmt(v: number | null | undefined, digits = 0): string {
   if (v == null) return "—"
@@ -154,26 +154,39 @@ export default function TodayPage() {
 
       {/* Training load snapshot */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <Tooltip definition={DEFS.CTL}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Chronic Training Load (CTL)</p></Tooltip>
-          <p className={`text-2xl font-bold font-mono text-[var(--chart-1)]`}>{fmt(load?.ctl, 1)}</p>
-          <p className="text-xs text-muted-foreground">target: 75+ by July</p>
-        </div>
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <Tooltip definition={DEFS.ATL}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Acute Training Load (ATL)</p></Tooltip>
-          <p className={`text-2xl font-bold font-mono text-[var(--chart-2)]`}>{fmt(load?.atl, 1)}</p>
-          <p className="text-xs text-muted-foreground"><Tooltip definition={DEFS.TSS}>Training Stress Score (TSS)</Tooltip> today: {fmt(load?.tss)}</p>
-        </div>
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <Tooltip definition={DEFS.TSB}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Training Stress Balance (TSB)</p></Tooltip>
-          <p className={`text-2xl font-bold font-mono ${tsbColor(load?.tsb ?? null)}`}>{fmt(load?.tsb, 1)}</p>
-          <p className="text-xs text-muted-foreground">{load?.tsb != null ? (load.tsb > 5 ? "Fresh & ready" : load.tsb < -20 ? "Overreached" : "Building") : "—"}</p>
-        </div>
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <Tooltip definition={DEFS.ACWR}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Workload Ratio (ACWR)</p></Tooltip>
-          <p className={`text-2xl font-bold font-mono ${acwrColor(load?.acwr ?? null)}`}>{fmt(load?.acwr, 2)}</p>
-          <p className="text-xs text-muted-foreground">{load?.acwr != null ? (load.acwr > 1.3 ? "⚠ Injury risk zone" : load.acwr > 1.1 ? "Caution" : "Safe zone") : "—"}</p>
-        </div>
+        <MetricCard
+          label="Chronic Training Load (CTL)"
+          value={fmt(load?.ctl, 1)}
+          sub="target: 75+ by July"
+          valueClass="text-[var(--chart-1)]"
+          definition={DEFS.CTL}
+          insight={ctlInsight(load?.ctl ?? null)}
+        />
+        <MetricCard
+          label="Acute Training Load (ATL)"
+          value={fmt(load?.atl, 1)}
+          sub={`Training Stress Score (TSS) today: ${fmt(load?.tss)}`}
+          valueClass="text-[var(--chart-2)]"
+          definition={DEFS.ATL}
+          insight={atlInsight(load?.atl ?? null)}
+        />
+        <MetricCard
+          label="Training Stress Balance (TSB)"
+          value={fmt(load?.tsb, 1)}
+          sub={load?.tsb != null ? (load.tsb > 5 ? "Fresh & ready" : load.tsb < -20 ? "Overreached" : "Building") : "—"}
+          valueClass={tsbColor(load?.tsb ?? null)}
+          definition={DEFS.TSB}
+          insight={tsbInsight(load?.tsb ?? null)}
+        />
+        <MetricCard
+          label="Workload Ratio (ACWR)"
+          value={fmt(load?.acwr, 2)}
+          sub={load?.acwr != null ? (load.acwr > 1.3 ? "⚠ Injury risk zone" : load.acwr > 1.1 ? "Caution" : "Safe zone") : "—"}
+          valueClass={acwrColor(load?.acwr ?? null)}
+          definition={DEFS.ACWR}
+          insight={acwrInsight(load?.acwr ?? null)}
+          highlight={(load?.acwr ?? 0) > 1.3}
+        />
       </div>
 
       {/* HRV + Readiness */}
@@ -215,20 +228,21 @@ export default function TodayPage() {
 
       {/* VO2 max + body */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <Tooltip definition={DEFS.VO2}><p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">VO2 Max</p></Tooltip>
-          <p className="text-2xl font-bold font-mono text-[var(--chart-5)]">{fmt(load?.vo2_max, 1)}</p>
-          <p className="text-xs text-muted-foreground">target: 55+ by July</p>
-        </div>
-        <div className="bg-card rounded-2xl p-4 space-y-1">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Weight</p>
-          <p className="text-2xl font-bold font-mono">
-            {body?.weight_kg ? `${(body.weight_kg * 2.20462).toFixed(0)} lb` : "—"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {body?.fat_ratio ? `${fmt(body.fat_ratio, 1)}% fat · goal: ≤15%` : "goal: ≤15% fat"}
-          </p>
-        </div>
+        <MetricCard
+          label="VO2 Max"
+          value={fmt(load?.vo2_max, 1)}
+          sub="target: 55+ by July"
+          valueClass="text-[var(--chart-5)]"
+          definition={DEFS.VO2}
+          insight={vo2Insight(load?.vo2_max ?? null)}
+        />
+        <MetricCard
+          label="Weight"
+          value={body?.weight_kg ? `${(body.weight_kg * 2.20462).toFixed(0)} lb` : "—"}
+          sub={body?.fat_ratio ? `${fmt(body.fat_ratio, 1)}% body fat · goal: ≤15%` : "goal: 170 lb / ≤15% body fat"}
+          definition="Your current body weight from Withings scale sync. Goal is 170 lb at ≤15% body fat by race day (July 18, 2026)."
+          insight={body?.weight_kg ? `Currently ${((body.weight_kg * 2.20462) - 170).toFixed(0)} lb above goal weight. Consistent caloric deficit on rest/easy days + high protein (180-200g) will drive gradual recomp without sacrificing training performance.` : "No recent weigh-in. Step on scale to track progress toward 170 lb goal."}
+        />
       </div>
 
       {/* Last workout */}

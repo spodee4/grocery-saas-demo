@@ -136,6 +136,14 @@ function DayCard({ day, isToday }: { day: DayMeals; isToday: boolean }) {
               <p className="text-xs text-muted-foreground">{day.hydration_tip}</p>
             </div>
           )}
+
+          {/* Coach Analysis */}
+          {day.daily_analysis && (
+            <div className="border-t border-border pt-2 rounded-xl bg-primary/5 p-2 -mx-0.5">
+              <p className="text-[10px] font-medium text-primary uppercase tracking-wider mb-1">Coach Analysis</p>
+              <p className="text-xs text-foreground/80 leading-relaxed">{day.daily_analysis}</p>
+            </div>
+          )}
         </div>
       )}
     </div>

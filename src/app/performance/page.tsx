@@ -4,10 +4,17 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchTrends } from "@/lib/api"
 import type { TrendPoint } from "@/lib/api"
+import type { PerformanceInsights } from "@/app/api/performance-insights/route"
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine
 } from "recharts"
+
+async function fetchInsights(force = false): Promise<PerformanceInsights> {
+  const res = await fetch(`/api/performance-insights${force ? "?force=1" : ""}`)
+  if (!res.ok) throw new Error("Failed")
+  return res.json()
+}
 
 const COLORS = {
   ctl: "oklch(0.6801 0.1583 276.93)",
@@ -47,6 +54,13 @@ export default function PerformancePage() {
   const { data = [], isLoading } = useQuery<TrendPoint[]>({
     queryKey: ["trends", days],
     queryFn: () => fetchTrends(days),
+  })
+
+  const { data: insights, isLoading: insightsLoading, refetch: refetchInsights, isFetching: insightsFetching } = useQuery<PerformanceInsights>({
+    queryKey: ["performance-insights"],
+    queryFn: () => fetchInsights(),
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: 1,
   })
 
   const latest = data[data.length - 1]
@@ -153,7 +167,7 @@ export default function PerformancePage() {
       {/* TSS load bars */}
       {!isLoading && (
         <div className="bg-card rounded-2xl p-4 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily TSS</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily Training Stress Score (TSS)</p>
           <ResponsiveContainer width="100%" height={120}>
             <ComposedChart data={data.slice(-30)} margin={{ left: -20, right: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.28 0.02 257 / 0.5)" vertical={false} />
@@ -165,6 +179,87 @@ export default function PerformancePage() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* AI Performance Insights */}
+      <div className="bg-card rounded-2xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Body Intelligence</p>
+          <button
+            onClick={() => refetchInsights()}
+            disabled={insightsFetching}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            {insightsFetching ? "Analyzing…" : "↺ Refresh"}
+          </button>
+        </div>
+
+        {insightsLoading || insightsFetching ? (
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-4 bg-muted/50 rounded animate-pulse" style={{ width: `${70 + i * 8}%` }} />
+            ))}
+          </div>
+        ) : insights ? (
+          <div className="space-y-4">
+            {/* Narrative */}
+            <p className="text-sm text-foreground/90 leading-relaxed italic border-l-2 border-primary/40 pl-3">
+              {insights.narrative}
+            </p>
+
+            {/* What's working */}
+            {insights.bullets_working?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-medium text-secondary uppercase tracking-wider">What's Working</p>
+                {insights.bullets_working.map((b, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-secondary text-xs shrink-0 mt-0.5">✓</span>
+                    <p className="text-xs text-foreground/80 leading-relaxed">{b}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* What to improve */}
+            {insights.bullets_improve?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-medium text-accent uppercase tracking-wider">Focus Areas</p>
+                {insights.bullets_improve.map((b, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-accent text-xs shrink-0 mt-0.5">→</span>
+                    <p className="text-xs text-foreground/80 leading-relaxed">{b}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Patterns */}
+            {insights.patterns?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-medium text-primary uppercase tracking-wider">Patterns Detected</p>
+                {insights.patterns.map((p, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-primary text-xs shrink-0 mt-0.5">◈</span>
+                    <p className="text-xs text-foreground/80 leading-relaxed">{p}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Zone comment */}
+            {insights.zone_comment && (
+              <p className="text-xs text-muted-foreground border-t border-border pt-3 leading-relaxed">
+                Zone balance: {insights.zone_comment}
+              </p>
+            )}
+
+            <p className="text-[10px] text-muted-foreground">
+              Generated {new Date(insights.generated_at).toLocaleString()}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Could not load insights</p>
+        )}
+      </div>
     </div>
   )
 }

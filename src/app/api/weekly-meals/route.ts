@@ -28,6 +28,7 @@ export interface DayMeals {
   pre_workout: string | null
   post_workout: string | null
   hydration_tip: string
+  daily_analysis: string   // coaching note: why these targets, weight/fat loss context, tomorrow preview
 }
 
 export interface WeeklyMealPlan {
@@ -115,13 +116,17 @@ Days: ${weekDays.map(d => d.day + " " + d.date).join(", ")}
 - Sat: Long run 90-150 min (longest day)
 - Sun: Rest or very easy active recovery
 
-## FOOD PREFERENCES / PRACTICAL
+## EATING PATTERN / FOOD PREFERENCES
+- NO BREAKFAST — John skips breakfast (intermittent fasting / not hungry in AM)
+- Meals are: pre-workout fuel (if needed) → lunch → afternoon snack → dinner
+- On training days: pre-workout snack before workout + post-workout protein within 30-45 min
+- Favorite smoothie (3-4x/week): frozen banana + frozen blueberries + 1 scoop protein powder + Greek yogurt or milk — use as post-workout shake OR afternoon snack
 - Protein sources: chicken, ground turkey, eggs, Greek yogurt, cottage cheese, whey protein, salmon
-- Carb sources: oats, rice, sweet potato, pasta, bread, bananas, berries, dates
+- Carb sources: rice, sweet potato, pasta, bread, bananas, berries, dates, oats
 - Fat sources: avocado, olive oil, nuts, almond butter
-- Post-workout shake: always within 30-45 min on training days — 2 scoops whey + fruit + oats
-- Practical: simple meals, batch-cook friendly, real food over supplements
+- Less prep is better — batch-cook friendly, simple recipes, real food over supplements
 - Keep processed food minimal
+- WEIGHT LOSS CONTEXT: John wants to lose body fat while fueling training. Every day should have a slight caloric deficit from TDEE except long run days. Rest days most deficit-focused. Never sacrifice protein (180-200g min always).
 
 ## INSTRUCTIONS
 Return ONLY a JSON object with this schema:
@@ -137,16 +142,17 @@ Return ONLY a JSON object with this schema:
       "carbs_g": 365,
       "protein_g": 190,
       "fat_g": 65,
-      "breakfast": "specific meal with quantities e.g. '3 eggs scrambled + 2 slices toast + banana + black coffee'",
-      "breakfast_macros": "~60g carbs, 25g protein, 15g fat",
-      "lunch": "specific meal",
+      "breakfast": "SKIP — John does not eat breakfast",
+      "breakfast_macros": "0g — fasted AM",
+      "lunch": "specific meal with quantities (first meal of the day)",
       "lunch_macros": "~macro breakdown",
       "dinner": "specific meal",
       "dinner_macros": "~macro breakdown",
       "snacks": ["snack 1 with quantity", "post-workout shake if training day"],
       "pre_workout": "pre-run fuel if applicable e.g. 'banana + coffee 30 min before' or null",
       "post_workout": "post-workout window within 30-45 min e.g. 'protein shake + banana immediately after' or null",
-      "hydration_tip": "specific hydration advice for this day's training"
+      "hydration_tip": "specific hydration advice for this day's training",
+      "daily_analysis": "2-3 sentence coaching note: why these specific calorie/macro targets were chosen for this day type, how it supports the goal of reaching 170 lb / ≤15% body fat while fueling training performance, and any tomorrow context (e.g. 'Tomorrow is your long run so tonight's higher-carb dinner pre-loads glycogen')"
     }
     // repeat for all 7 days
   ],
@@ -157,7 +163,7 @@ Return ONLY a JSON object with this schema:
   try {
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
     })
 

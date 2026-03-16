@@ -62,6 +62,10 @@ export interface CoachBrief {
   analysis: string
   alerts: string[]
   workout_notes: string
+  motivational_quote: {
+    text: string
+    author: string
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -141,6 +145,13 @@ Available: sauna, cold plunge, red light therapy, steam room
 - Red light: 10-20 min any time, especially for muscle recovery
 - Yoga/stretching: tailor to muscle groups used in recent workouts
 
+## EATING PATTERN
+- John skips breakfast (intermittent fasting) — first meal is lunch or a pre-workout snack
+- Meals are: pre-workout fuel → lunch → afternoon snack/smoothie → dinner
+- Favorite smoothie: frozen banana + frozen blueberries + protein powder + Greek yogurt or milk
+- Less prep is better — simple, real food
+- Always spell out metric names fully (Chronic Training Load not CTL, etc.) in descriptions and analysis
+
 ## INSTRUCTIONS
 Respond with ONLY a JSON object. No markdown, no explanation:
 
@@ -159,15 +170,6 @@ Respond with ONLY a JSON object. No markdown, no explanation:
     "effort": "effort level",
     "preview": "one sentence"
   },
-  "nutrition": {
-    "day_type": "Easy day / Moderate day / Long run day / Rest day",
-    "calories_target": number,
-    "carbs_g": number,
-    "protein_g": number,
-    "fat_g": number,
-    "timing_tip": "specific timing advice",
-    "meals": ["breakfast", "lunch", "dinner", "snack or pre-workout"]
-  },
   "recovery": {
     "primary": "best recovery tool for this specific workout — cold plunge only for runs/cardio NOT weights (heat/sauna/red-light better post-weights), or stretching/yoga for rest days",
     "protocol": "specific duration and temp e.g. '4 min at 52°F' or '20 min sauna at 170°F'",
@@ -184,9 +186,22 @@ Respond with ONLY a JSON object. No markdown, no explanation:
     "timing": "Morning / At lunch / Evening / Anytime",
     "why": "how this builds toward the 100-mile race"
   },
-  "analysis": "3-4 sentences coaching insight on fitness trajectory",
+  "nutrition": {
+    "day_type": "Easy day / Moderate day / Long run day / Rest day",
+    "calories_target": number,
+    "carbs_g": number,
+    "protein_g": number,
+    "fat_g": number,
+    "timing_tip": "specific timing advice — remember no breakfast, first meal is lunch",
+    "meals": ["Pre-workout: ...", "Lunch (first meal): ...", "Afternoon snack or smoothie: ...", "Dinner: ..."]
+  },
+  "analysis": "3-4 sentences coaching insight on fitness trajectory. Use full metric names: Chronic Training Load (CTL), Acute Training Load (ATL), Training Stress Balance (TSB), Heart Rate Variability (HRV). Be direct.",
   "alerts": ["alert if any — keep to real concerns only, empty array if none"],
-  "workout_notes": "2-3 sentences on last workout pattern and what it means"
+  "workout_notes": "2-3 sentences on last workout pattern and what it means",
+  "motivational_quote": {
+    "text": "a fresh, punchy motivational quote — rotate between: David Goggins, Andrew Huberman, Tony Robbins, Kobe Bryant, Michael Jordan, Eliud Kipchoge, Dean Karnazes, Courtney Dauwalter (ultra champ), Theo Von (funny but motivating), or an original coach line. Keep it under 40 words. Today's date: ${today}",
+    "author": "attribution name"
+  }
 }`
 
   try {
