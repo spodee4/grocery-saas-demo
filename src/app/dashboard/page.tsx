@@ -105,28 +105,52 @@ function DashboardInner() {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Trend chart */}
-        <div className="col-span-2 bg-card border border-border rounded-lg p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium">6-Week Sales Trend</p>
-            <span className="text-xs text-muted-foreground">Weekly</span>
+      <div className="grid grid-cols-3 gap-4 items-start">
+        {/* Left column: mini cards + trend chart */}
+        <div className="col-span-2 space-y-3">
+          {/* Mini stat cards */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Top dept this week */}
+            <div className="bg-card border border-border rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Top Dept · This Week</p>
+              <p className="text-lg font-semibold mt-1">{sortedDepts[0]?.dept}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {fmt$(sortedDepts[0]?.sales ?? 0)} sales · <span className="text-primary font-medium">{fmtPct(sortedDepts[0]?.gm_pct ?? 0)} GM</span>
+              </p>
+            </div>
+            {/* EBT / tender split */}
+            <div className="bg-card border border-border rounded-lg px-4 py-3 shadow-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">EBT this week</p>
+              <p className="text-lg font-semibold mt-1">{fmt$(store.tender.ebt)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {fmtPct((store.tender.ebt / (store.tender.cash + store.tender.credit + store.tender.debit + store.tender.ebt + store.tender.checks + store.tender.gift_cards)) * 100)} of tender ·{" "}
+                <span className="text-foreground font-medium">Cash {fmtPct((store.tender.cash / (store.tender.cash + store.tender.credit + store.tender.debit + store.tender.ebt + store.tender.checks + store.tender.gift_cards)) * 100)}</span>
+              </p>
+            </div>
           </div>
-          <ResponsiveContainer width="100%" height={75}>
-            <BarChart data={store.weekly_trend} barSize={28}>
-              <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-              <YAxis hide domain={['auto', 'auto']} />
-              <RTooltip
-                cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-                contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: 12, color: "var(--foreground)" }}
-                labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
-                itemStyle={{ color: "var(--primary)", fontWeight: 600 }}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={(v: any) => [fmt$(Number(v ?? 0)), ""]}
-              />
-              <Bar dataKey="sales" fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.85} />
-            </BarChart>
-          </ResponsiveContainer>
+
+          {/* Trend chart — shorter */}
+          <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium">6-Week Sales Trend</p>
+              <span className="text-xs text-muted-foreground">Weekly</span>
+            </div>
+            <ResponsiveContainer width="100%" height={80}>
+              <BarChart data={store.weekly_trend} barSize={28}>
+                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis hide domain={['auto', 'auto']} />
+                <RTooltip
+                  cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: 12, color: "var(--foreground)" }}
+                  labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
+                  itemStyle={{ color: "var(--primary)", fontWeight: 600 }}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(v: any) => [fmt$(Number(v ?? 0)), ""]}
+                />
+                <Bar dataKey="sales" fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.85} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Alerts column */}
