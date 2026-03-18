@@ -417,6 +417,114 @@ const potlatchShrink: ShrinkRow[] = [
   { dept: "Grocery",      shrink_dollars: 243,  shrink_pct: 0.8, known: 100, unknown: 143, prior_shrink_pct: 0.7 },
 ]
 
+// ─── Quincy ───────────────────────────────────────────────────────────────────
+const quincyDepts: DeptRow[] = [
+  { dept: "Grocery",      sales: 72600, purchases: 52100, gm_dollars: 20500, gm_pct: 28.2, prior_sales: 70400, wow_pct:  3.1 },
+  { dept: "Meat",         sales: 39200, purchases: 25610, gm_dollars: 13590, gm_pct: 34.7, prior_sales: 40100, wow_pct: -2.2 },
+  { dept: "Produce",      sales: 25400, purchases: 15750, gm_dollars:  9650, gm_pct: 38.0, prior_sales: 24800, wow_pct:  2.4 },
+  { dept: "Dairy",        sales: 20100, purchases: 14590, gm_dollars:  5510, gm_pct: 27.4, prior_sales: 20800, wow_pct: -3.4 },
+  { dept: "Beverages",    sales: 17200, purchases: 13210, gm_dollars:  3990, gm_pct: 23.2, prior_sales: 18100, wow_pct: -5.0 },
+  { dept: "Frozen Foods", sales: 13800, purchases:  9534, gm_dollars:  4266, gm_pct: 30.9, prior_sales: 12900, wow_pct:  7.0 },
+  { dept: "Bakery",       sales: 11200, purchases:  5376, gm_dollars:  5824, gm_pct: 52.0, prior_sales: 10400, wow_pct:  7.7 },
+  { dept: "Non-Foods",    sales:  7400, purchases:  4810, gm_dollars:  2590, gm_pct: 35.0, prior_sales:  7100, wow_pct:  4.2 },
+  { dept: "Beer & Wine",  sales:  6600, purchases:  4620, gm_dollars:  1980, gm_pct: 30.0, prior_sales:  6300, wow_pct:  4.8 },
+  { dept: "Service Deli", sales:  3500, purchases:  1575, gm_dollars:  1925, gm_pct: 55.0, prior_sales:  3200, wow_pct:  9.4 },
+]
+const quincyWeeklyTrend: WeekPoint[] = [
+  { week: "Feb 10", sales: 196400, gm_pct: 31.8 }, { week: "Feb 17", sales: 200100, gm_pct: 31.4 },
+  { week: "Feb 24", sales: 203800, gm_pct: 32.0 }, { week: "Mar 3",  sales: 209200, gm_pct: 32.3 },
+  { week: "Mar 10", sales: 214100, gm_pct: 32.1 }, { week: "Mar 17", sales: 217000, gm_pct: 32.0 },
+]
+const quincyTender: TenderSummary = {
+  cash: 33200, credit: 81400, debit: 57600, ebt: 24100, checks: 5200, gift_cards: 11500,
+  customer_count: 5280, voids: 31, refunds: 56, refund_amount: 3010,
+}
+const quincyBankDeposit: BankDeposit = {
+  date: "Mar 16, 2026", cash_bills: 28600, cash_coins: 4600,
+  checks: [
+    { check_number: "3310", amount: 1420.00, from: "Quincy School District" },
+    { check_number: "7721", amount: 840.00, from: "Columbia Basin Farms" },
+  ],
+  credit_batch: 81400, debit_batch: 57600, safe_starting: 7500, safe_ending: 6000, change_order: 2500,
+}
+const quincyShrink: ShrinkRow[] = [
+  { dept: "Meat",         shrink_dollars: 1176, shrink_pct: 3.0, known: 440, unknown: 736, prior_shrink_pct: 2.8 },
+  { dept: "Produce",      shrink_dollars: 1016, shrink_pct: 4.0, known: 710, unknown: 306, prior_shrink_pct: 3.9 },
+  { dept: "Bakery",       shrink_dollars:  560, shrink_pct: 5.0, known: 500, unknown:  60, prior_shrink_pct: 4.8 },
+  { dept: "Dairy",        shrink_dollars:  402, shrink_pct: 2.0, known: 110, unknown: 292, prior_shrink_pct: 1.8 },
+  { dept: "Grocery",      shrink_dollars:  581, shrink_pct: 0.8, known: 250, unknown: 331, prior_shrink_pct: 0.7 },
+]
+
+// ─── Oroville ─────────────────────────────────────────────────────────────────
+const orovilleDepts: DeptRow[] = [
+  { dept: "Grocery",      sales: 25400, purchases: 18200, gm_dollars:  7200, gm_pct: 28.3, prior_sales: 24900, wow_pct:  2.0 },
+  { dept: "Meat",         sales: 14100, purchases:  9330, gm_dollars:  4770, gm_pct: 33.8, prior_sales: 14600, wow_pct: -3.4 },
+  { dept: "Produce",      sales:  9200, purchases:  5704, gm_dollars:  3496, gm_pct: 38.0, prior_sales:  8900, wow_pct:  3.4 },
+  { dept: "Dairy",        sales:  7800, purchases:  5694, gm_dollars:  2106, gm_pct: 27.0, prior_sales:  8100, wow_pct: -3.7 },
+  { dept: "Beverages",    sales:  6400, purchases:  4928, gm_dollars:  1472, gm_pct: 23.0, prior_sales:  6700, wow_pct: -4.5 },
+  { dept: "Frozen Foods", sales:  5100, purchases:  3519, gm_dollars:  1581, gm_pct: 31.0, prior_sales:  4900, wow_pct:  4.1 },
+  { dept: "Bakery",       sales:  4400, purchases:  2112, gm_dollars:  2288, gm_pct: 52.0, prior_sales:  4200, wow_pct:  4.8 },
+  { dept: "Non-Foods",    sales:  3000, purchases:  1950, gm_dollars:  1050, gm_pct: 35.0, prior_sales:  2900, wow_pct:  3.4 },
+  { dept: "Beer & Wine",  sales:  2500, purchases:  1775, gm_dollars:   725, gm_pct: 29.0, prior_sales:  2400, wow_pct:  4.2 },
+  { dept: "Service Deli", sales:  1600, purchases:   736, gm_dollars:   864, gm_pct: 54.0, prior_sales:  1500, wow_pct:  6.7 },
+]
+const orovilleWeeklyTrend: WeekPoint[] = [
+  { week: "Feb 10", sales: 73200, gm_pct: 30.8 }, { week: "Feb 17", sales: 74100, gm_pct: 31.0 },
+  { week: "Feb 24", sales: 73800, gm_pct: 30.5 }, { week: "Mar 3",  sales: 75400, gm_pct: 31.2 },
+  { week: "Mar 10", sales: 77200, gm_pct: 31.0 }, { week: "Mar 17", sales: 79500, gm_pct: 30.8 },
+]
+const orovilleTender: TenderSummary = {
+  cash: 12800, credit: 29400, debit: 20800, ebt: 9200, checks: 1900, gift_cards: 4400,
+  customer_count: 1960, voids: 11, refunds: 18, refund_amount: 920,
+}
+const orovilleBankDeposit: BankDeposit = {
+  date: "Mar 16, 2026", cash_bills: 11000, cash_coins: 1800,
+  checks: [{ check_number: "1840", amount: 680.00, from: "Oroville School Dist." }],
+  credit_batch: 29400, debit_batch: 20800, safe_starting: 4000, safe_ending: 3500, change_order: 1200,
+}
+const orovilleShrink: ShrinkRow[] = [
+  { dept: "Meat",         shrink_dollars: 423, shrink_pct: 3.0, known: 160, unknown: 263, prior_shrink_pct: 2.7 },
+  { dept: "Produce",      shrink_dollars: 368, shrink_pct: 4.0, known: 264, unknown: 104, prior_shrink_pct: 3.8 },
+  { dept: "Bakery",       shrink_dollars: 220, shrink_pct: 5.0, known: 195, unknown:  25, prior_shrink_pct: 4.6 },
+  { dept: "Dairy",        shrink_dollars: 156, shrink_pct: 2.0, known:  44, unknown: 112, prior_shrink_pct: 1.9 },
+  { dept: "Grocery",      shrink_dollars: 203, shrink_pct: 0.8, known:  90, unknown: 113, prior_shrink_pct: 0.7 },
+]
+
+// ─── Soap Lake ────────────────────────────────────────────────────────────────
+const soaplakeDepts: DeptRow[] = [
+  { dept: "Grocery",      sales: 21200, purchases: 15200, gm_dollars:  6000, gm_pct: 28.3, prior_sales: 20800, wow_pct:  1.9 },
+  { dept: "Meat",         sales: 11800, purchases:  7845, gm_dollars:  3955, gm_pct: 33.5, prior_sales: 12200, wow_pct: -3.3 },
+  { dept: "Produce",      sales:  7700, purchases:  4774, gm_dollars:  2926, gm_pct: 38.0, prior_sales:  7400, wow_pct:  4.1 },
+  { dept: "Dairy",        sales:  6500, purchases:  4745, gm_dollars:  1755, gm_pct: 27.0, prior_sales:  6700, wow_pct: -3.0 },
+  { dept: "Beverages",    sales:  5400, purchases:  4158, gm_dollars:  1242, gm_pct: 23.0, prior_sales:  5600, wow_pct: -3.6 },
+  { dept: "Frozen Foods", sales:  4200, purchases:  2898, gm_dollars:  1302, gm_pct: 31.0, prior_sales:  4000, wow_pct:  5.0 },
+  { dept: "Bakery",       sales:  3700, purchases:  1776, gm_dollars:  1924, gm_pct: 52.0, prior_sales:  3500, wow_pct:  5.7 },
+  { dept: "Non-Foods",    sales:  2400, purchases:  1560, gm_dollars:   840, gm_pct: 35.0, prior_sales:  2300, wow_pct:  4.3 },
+  { dept: "Beer & Wine",  sales:  1900, purchases:  1349, gm_dollars:   551, gm_pct: 29.0, prior_sales:  1800, wow_pct:  5.6 },
+  { dept: "Service Deli", sales:   900, purchases:   414, gm_dollars:   486, gm_pct: 54.0, prior_sales:   850, wow_pct:  5.9 },
+]
+const soaplakeWeeklyTrend: WeekPoint[] = [
+  { week: "Feb 10", sales: 60400, gm_pct: 30.8 }, { week: "Feb 17", sales: 61200, gm_pct: 31.0 },
+  { week: "Feb 24", sales: 61800, gm_pct: 30.6 }, { week: "Mar 3",  sales: 63100, gm_pct: 31.2 },
+  { week: "Mar 10", sales: 64200, gm_pct: 31.0 }, { week: "Mar 17", sales: 65700, gm_pct: 30.9 },
+]
+const soaplakeTender: TenderSummary = {
+  cash: 10700, credit: 24600, debit: 17400, ebt: 7700, checks: 1600, gift_cards: 3700,
+  customer_count: 1640, voids: 9, refunds: 14, refund_amount: 740,
+}
+const soaplakeBankDeposit: BankDeposit = {
+  date: "Mar 16, 2026", cash_bills: 9200, cash_coins: 1500,
+  checks: [{ check_number: "0941", amount: 420.00, from: "Soap Lake School Dist." }],
+  credit_batch: 24600, debit_batch: 17400, safe_starting: 3500, safe_ending: 3000, change_order: 1000,
+}
+const soaplakeShrink: ShrinkRow[] = [
+  { dept: "Meat",         shrink_dollars: 354, shrink_pct: 3.0, known: 135, unknown: 219, prior_shrink_pct: 2.8 },
+  { dept: "Produce",      shrink_dollars: 308, shrink_pct: 4.0, known: 220, unknown:  88, prior_shrink_pct: 3.7 },
+  { dept: "Bakery",       shrink_dollars: 185, shrink_pct: 5.0, known: 165, unknown:  20, prior_shrink_pct: 4.5 },
+  { dept: "Dairy",        shrink_dollars: 130, shrink_pct: 2.0, known:  38, unknown:  92, prior_shrink_pct: 1.8 },
+  { dept: "Grocery",      shrink_dollars: 170, shrink_pct: 0.8, known:  75, unknown:  95, prior_shrink_pct: 0.7 },
+]
+
 export const STORES: Record<string, StoreData> = {
   lakes: {
     id: "lakes",
@@ -474,6 +582,55 @@ export const STORES: Record<string, StoreData> = {
         { vendor: "URM Distributing", purchases: 52400, earned: 1890, applied: 420, gap: 1470 },
         { vendor: "UNFI Natural",      purchases:  7100, earned:  480, applied: 480, gap:    0 },
         { vendor: "Coca-Cola Bottling",purchases:  2600, earned:  130, applied: 130, gap:    0 },
+      ],
+    },
+  },
+  quincy: {
+    id: "quincy", name: "Quincy", location: "Quincy, WA",
+    weekly_sales: totalSales(quincyDepts), weekly_gm: totalGM(quincyDepts),
+    weekly_gm_pct: Math.round((totalGM(quincyDepts) / totalSales(quincyDepts)) * 1000) / 10,
+    prior_weekly_sales: 214100, transactions: 5280, avg_basket: totalSales(quincyDepts) / 5280,
+    departments: quincyDepts, weekly_trend: quincyWeeklyTrend, recent_invoices: [],
+    tender: quincyTender, bank_deposit: quincyBankDeposit, shrink: quincyShrink,
+    allowances: {
+      total_purchases: totalPurchases(quincyDepts), allowances_earned: 6200, allowances_applied: 2800, gap: 3400, gap_pct: 2.9,
+      vendors: [
+        { vendor: "URM Distributing", purchases: 124000, earned: 4480, applied: 1960, gap: 2520 },
+        { vendor: "UNFI Natural",      purchases: 17400,  earned: 1160, applied: 1160, gap:    0 },
+        { vendor: "Frito-Lay DSD",     purchases:  5200,  earned:  260, applied:    0, gap:  260 },
+        { vendor: "Coca-Cola Bottling",purchases:  5800,  earned:  290, applied:  290, gap:    0 },
+      ],
+    },
+  },
+  oroville: {
+    id: "oroville", name: "Oroville", location: "Oroville, WA",
+    weekly_sales: totalSales(orovilleDepts), weekly_gm: totalGM(orovilleDepts),
+    weekly_gm_pct: Math.round((totalGM(orovilleDepts) / totalSales(orovilleDepts)) * 1000) / 10,
+    prior_weekly_sales: 77200, transactions: 1960, avg_basket: totalSales(orovilleDepts) / 1960,
+    departments: orovilleDepts, weekly_trend: orovilleWeeklyTrend, recent_invoices: [],
+    tender: orovilleTender, bank_deposit: orovilleBankDeposit, shrink: orovilleShrink,
+    allowances: {
+      total_purchases: totalPurchases(orovilleDepts), allowances_earned: 2100, allowances_applied: 950, gap: 1150, gap_pct: 2.3,
+      vendors: [
+        { vendor: "URM Distributing", purchases: 46000, earned: 1660, applied: 760, gap: 900 },
+        { vendor: "UNFI Natural",      purchases:  6200, earned:  410, applied: 410, gap:   0 },
+        { vendor: "Coca-Cola Bottling",purchases:  2200, earned:  110, applied: 110, gap:   0 },
+      ],
+    },
+  },
+  soaplake: {
+    id: "soaplake", name: "Soap Lake", location: "Soap Lake, WA",
+    weekly_sales: totalSales(soaplakeDepts), weekly_gm: totalGM(soaplakeDepts),
+    weekly_gm_pct: Math.round((totalGM(soaplakeDepts) / totalSales(soaplakeDepts)) * 1000) / 10,
+    prior_weekly_sales: 64200, transactions: 1640, avg_basket: totalSales(soaplakeDepts) / 1640,
+    departments: soaplakeDepts, weekly_trend: soaplakeWeeklyTrend, recent_invoices: [],
+    tender: soaplakeTender, bank_deposit: soaplakeBankDeposit, shrink: soaplakeShrink,
+    allowances: {
+      total_purchases: totalPurchases(soaplakeDepts), allowances_earned: 1750, allowances_applied: 820, gap: 930, gap_pct: 2.4,
+      vendors: [
+        { vendor: "URM Distributing", purchases: 38400, earned: 1380, applied: 640, gap: 740 },
+        { vendor: "UNFI Natural",      purchases:  5100, earned:  340, applied: 340, gap:   0 },
+        { vendor: "Coca-Cola Bottling",purchases:  1800, earned:   90, applied:  90, gap:   0 },
       ],
     },
   },

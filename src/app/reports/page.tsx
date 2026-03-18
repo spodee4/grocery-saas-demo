@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { STORES } from "@/lib/demo-data"
+import { loadSettings } from "@/app/settings/page"
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -576,6 +577,10 @@ function ReportsInner() {
   const [periodId, setPeriodId] = useState<PeriodKey>("week")
   const [customFrom, setCustomFrom] = useState("2026-03-01")
   const [customTo,   setCustomTo]   = useState("2026-03-16")
+  const [sendModal, setSendModal] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sentToast, setSentToast] = useState(false)
+  const [settings, setSettings] = useState(() => loadSettings())
 
   const customFactor = useMemo(() => {
     const days = Math.max(1, (new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86400000 + 1)
@@ -592,8 +597,77 @@ function ReportsInner() {
     return PERIODS.find(p => p.id === periodId)!
   }, [periodId, customFactor, customLabel2])
 
+  function handleSend() {
+    setSending(true)
+    setTimeout(() => {
+      setSending(false)
+      setSendModal(false)
+      setSentToast(true)
+      setTimeout(() => setSentToast(false), 3500)
+    }, 1800)
+  }
+
+  const acct = settings.accountant
+  const reportLabel = REPORT_TYPES.find(r => r.id === activeReport)?.label ?? activeReport
+
   return (
     <div className="p-6 max-w-5xl space-y-5">
+      {/* Send toast */}
+      {sentToast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-card border border-primary/40 shadow-xl rounded-lg px-4 py-3 text-sm animate-in fade-in slide-in-from-top-2">
+          <span className="text-primary">✓</span>
+          <span>Report sent to <strong>{acct.email || "accountant"}</strong></span>
+          <button onClick={() => setSentToast(false)} className="text-muted-foreground hover:text-foreground ml-2">✕</button>
+        </div>
+      )}
+
+      {/* Send modal */}
+      {sendModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSendModal(false)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 w-[420px] space-y-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <p className="text-base font-semibold">Send Report to Accountant</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Configure recipients in Settings → Accountant</p>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-1.5 border-b border-border/50">
+                <span className="text-muted-foreground">To</span>
+                <span className="font-medium">{acct.email || <span className="text-destructive italic">Not configured — add in Settings</span>}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-border/50">
+                <span className="text-muted-foreground">Report</span>
+                <span>{reportLabel}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-border/50">
+                <span className="text-muted-foreground">Period</span>
+                <span>{period.label2}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-border/50">
+                <span className="text-muted-foreground">Format</span>
+                <span className="capitalize">{acct.format}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-muted-foreground">Store</span>
+                <span>{STORES[storeId]?.name ?? "Lakes"}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setSendModal(false)}
+                className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-muted/20 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSend} disabled={sending || !acct.email}
+                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all">
+                {sending ? "Sending…" : "Send Now"}
+              </button>
+            </div>
+            {!acct.email && (
+              <p className="text-xs text-destructive text-center">Add accountant email in Settings first</p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Reports & Export</h1>
@@ -601,13 +675,22 @@ function ReportsInner() {
             {STORES[storeId]?.name ?? "Lakes"} · {period.label2} · BRdata POS
           </p>
         </div>
-        <button onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity print:hidden">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Export PDF
-        </button>
+        <div className="flex items-center gap-2 print:hidden">
+          <button onClick={() => setSendModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:border-primary/50 hover:bg-muted/20 transition-all">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Send to Accountant
+          </button>
+          <button onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Period selector */}
@@ -653,10 +736,10 @@ function ReportsInner() {
       <div className="grid grid-cols-5 gap-3 print:hidden">
         {REPORT_TYPES.map(rt => (
           <button key={rt.id} onClick={() => setActiveReport(rt.id)}
-            className={`p-4 rounded-lg border text-left transition-all ${
+            className={`p-4 rounded-xl border text-left transition-all shadow-sm ${
               activeReport === rt.id
-                ? "bg-primary/10 border-primary/50 ring-1 ring-primary/30"
-                : "bg-card border-border hover:border-primary/30 hover:bg-muted/20"
+                ? "bg-primary/10 border-primary/50 ring-2 ring-primary/20 shadow-md"
+                : "bg-card border-border hover:border-primary/30 hover:bg-muted/20 hover:shadow-md"
             }`}>
             <p className="text-xl mb-2">{rt.icon}</p>
             <p className="text-xs font-semibold leading-tight">{rt.label}</p>
@@ -666,10 +749,17 @@ function ReportsInner() {
       </div>
 
       {/* Report preview */}
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between print:hidden">
-          <p className="text-sm font-medium">{REPORT_TYPES.find(r => r.id === activeReport)?.label} · {period.label2}</p>
-          <p className="text-xs text-muted-foreground">Preview · Click "Export PDF" to print or save</p>
+      <div className="bg-card border border-border rounded-xl shadow-lg ring-1 ring-border/40 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-muted/10 print:hidden">
+          <div className="flex items-center gap-2">
+            <span className="text-base">{REPORT_TYPES.find(r => r.id === activeReport)?.icon}</span>
+            <p className="text-sm font-semibold">{REPORT_TYPES.find(r => r.id === activeReport)?.label}</p>
+            <span className="text-muted-foreground/50 text-xs">·</span>
+            <p className="text-xs text-muted-foreground">{period.label2}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted-foreground">Preview — click Export PDF to print</p>
+          </div>
         </div>
         <div className="p-6 overflow-x-auto">
           {activeReport === "pnl"     && <PnLReport     storeId={storeId} period={period} />}

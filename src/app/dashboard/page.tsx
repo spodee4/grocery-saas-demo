@@ -193,10 +193,60 @@ const WEEK_PILLS = [
   { id: "custom", label: "Custom", range: "",                 sMult: 1.000, pMult: 1.000 },
 ]
 
+function buildCompanyStore() {
+  const all = Object.values(STORES)
+  const totalSales = all.reduce((s, st) => s + st.weekly_sales, 0)
+  const totalGM    = all.reduce((s, st) => s + st.weekly_gm, 0)
+  const totalTxns  = all.reduce((s, st) => s + st.transactions, 0)
+  // Aggregate departments
+  const deptMap: Record<string, typeof all[0]["departments"][0]> = {}
+  all.forEach(st => st.departments.forEach(d => {
+    if (!deptMap[d.dept]) deptMap[d.dept] = { ...d, sales: 0, purchases: 0, gm_dollars: 0, prior_sales: 0 }
+    deptMap[d.dept].sales        += d.sales
+    deptMap[d.dept].purchases    += d.purchases
+    deptMap[d.dept].gm_dollars   += d.gm_dollars
+    deptMap[d.dept].prior_sales  += d.prior_sales
+  }))
+  const depts = Object.values(deptMap).map(d => ({
+    ...d, gm_pct: Math.round((d.gm_dollars / d.sales) * 1000) / 10,
+    wow_pct: Math.round(((d.sales - d.prior_sales) / d.prior_sales) * 1000) / 10,
+  }))
+  // Aggregate weekly trend
+  const trendMap: Record<string, { sales: number; gm_pct_sum: number; count: number }> = {}
+  all.forEach(st => st.weekly_trend.forEach(w => {
+    if (!trendMap[w.week]) trendMap[w.week] = { sales: 0, gm_pct_sum: 0, count: 0 }
+    trendMap[w.week].sales += w.sales
+    trendMap[w.week].gm_pct_sum += w.gm_pct
+    trendMap[w.week].count++
+  }))
+  const trend = Object.entries(trendMap).map(([week, v]) => ({ week, sales: v.sales, gm_pct: v.gm_pct_sum / v.count }))
+  return {
+    id: "company", name: "All Stores", location: "Company — 5 Locations",
+    weekly_sales: totalSales, weekly_gm: totalGM,
+    weekly_gm_pct: Math.round((totalGM / totalSales) * 1000) / 10,
+    prior_weekly_sales: all.reduce((s, st) => s + st.prior_weekly_sales, 0),
+    transactions: totalTxns, avg_basket: totalSales / totalTxns,
+    departments: depts, weekly_trend: trend,
+    recent_invoices: all.flatMap(st => st.recent_invoices),
+    tender: { cash: 0, credit: 0, debit: 0, ebt: 0, checks: 0, gift_cards: 0, customer_count: totalTxns, voids: 0, refunds: 0, refund_amount: 0 },
+    bank_deposit: all[0].bank_deposit,
+    shrink: all.flatMap(st => st.shrink),
+    allowances: {
+      total_purchases: all.reduce((s, st) => s + st.allowances.total_purchases, 0),
+      allowances_earned: all.reduce((s, st) => s + st.allowances.allowances_earned, 0),
+      allowances_applied: all.reduce((s, st) => s + st.allowances.allowances_applied, 0),
+      gap: all.reduce((s, st) => s + st.allowances.gap, 0),
+      gap_pct: 0,
+      vendors: [],
+    },
+  }
+}
+
 function DashboardInner() {
   const params = useSearchParams()
   const storeId = params.get("store") ?? "lakes"
-  const store = STORES[storeId] ?? STORES.lakes
+  const isCompany = storeId === "company"
+  const store = isCompany ? buildCompanyStore() : (STORES[storeId] ?? STORES.lakes)
 
   const [suspiciousOpen, setSuspiciousOpen] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState("wtd")
@@ -485,6 +535,73 @@ function DashboardInner() {
           </tbody>
         </table>
       </div>
+
+      {/* Company view: per-store breakdown */}
+      {isCompany && (
+        <div className="bg-card border border-border rounded-xl shadow-lg ring-1 ring-border/30 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border bg-muted/10 flex items-center justify-between">
+            <p className="text-sm font-semibold">Store-by-Store Breakdown</p>
+            <p className="text-xs text-muted-foreground">All 5 locations · This week</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] text-muted-foreground uppercase tracking-wide border-b border-border">
+                  <th className="text-left px-5 py-2.5 font-medium">Store</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Sales</th>
+                  <th className="text-right px-4 py-2.5 font-medium">vs LW</th>
+                  <th className="text-right px-4 py-2.5 font-medium">GM%</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Txns</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Avg $</th>
+                  <th className="text-right px-4 py-2.5 font-medium">% of Co.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.values(STORES).sort((a, b) => b.weekly_sales - a.weekly_sales).map((st, i) => {
+                  const wow = delta(st.weekly_sales, st.prior_weekly_sales)
+                  const pct = st.weekly_sales / store.weekly_sales * 100
+                  return (
+                    <tr key={st.id} className={`border-b border-border/30 hover:bg-muted/10 ${i % 2 === 1 ? "bg-muted/10" : ""}`}>
+                      <td className="px-5 py-3">
+                        <p className="font-medium">{st.name}</p>
+                        <p className="text-xs text-muted-foreground">{st.location}</p>
+                      </td>
+                      <td className="text-right px-4 py-3 font-mono tabular-nums font-semibold">{fmt$(st.weekly_sales)}</td>
+                      <td className={`text-right px-4 py-3 tabular-nums text-xs font-medium ${wow.positive ? "text-primary" : "text-destructive"}`}>
+                        {wow.label}
+                      </td>
+                      <td className={`text-right px-4 py-3 tabular-nums font-mono ${st.weekly_gm_pct >= 31 ? "text-primary" : st.weekly_gm_pct >= 28 ? "text-foreground" : "text-destructive"}`}>
+                        {st.weekly_gm_pct.toFixed(1)}%
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums text-muted-foreground">{st.transactions.toLocaleString()}</td>
+                      <td className="text-right px-4 py-3 tabular-nums text-muted-foreground">${st.avg_basket.toFixed(2)}</td>
+                      <td className="text-right px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
+                            <div className="h-full bg-primary/60 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs tabular-nums text-muted-foreground w-9 text-right">{pct.toFixed(0)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                <tr className="bg-muted/20 border-t-2 border-foreground/20 font-semibold">
+                  <td className="px-5 py-3">Total — Company</td>
+                  <td className="text-right px-4 py-3 font-mono tabular-nums">{fmt$(store.weekly_sales)}</td>
+                  <td className={`text-right px-4 py-3 text-xs font-medium ${delta(store.weekly_sales, store.prior_weekly_sales).positive ? "text-primary" : "text-destructive"}`}>
+                    {delta(store.weekly_sales, store.prior_weekly_sales).label}
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums font-mono text-primary">{store.weekly_gm_pct.toFixed(1)}%</td>
+                  <td className="text-right px-4 py-3 tabular-nums">{store.transactions.toLocaleString()}</td>
+                  <td className="text-right px-4 py-3 tabular-nums">${store.avg_basket.toFixed(2)}</td>
+                  <td className="text-right px-4 py-3 text-muted-foreground">100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

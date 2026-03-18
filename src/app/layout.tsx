@@ -4,7 +4,8 @@ import { Sidebar } from "@/components/Sidebar"
 
 export const metadata: Metadata = {
   title: "Store Intelligence",
-  description: "BRdata-connected financial intelligence",
+  description: "BRdata-connected financial intelligence for independent grocers",
+  icons: { icon: "/logo.svg" },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
